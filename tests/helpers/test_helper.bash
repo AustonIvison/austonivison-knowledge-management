@@ -16,7 +16,7 @@ load "${_lib_dir}/bats-assert/load"
 
 PROJECT_ROOT="/home/user/workspace/knowledge-management"
 
-setup() {
+common_setup() {
     # Create a unique temp directory for this test
     TEST_TEMP_DIR="$(mktemp -d)"
 
