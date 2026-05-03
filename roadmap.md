@@ -2,7 +2,7 @@
 
 > **Companion to [README.md](README.md).** This file holds the full critique, the v0/v1/v2 scope table, every numbered finding (B-, F-, N-series), the recommended ship plan, and the planned-feature list. The README links here from its **Roadmap** section.
 
-Status reflects the current shipping state of the project. v0 is **yellow, not green**, even *after* the original B1–B5 / F3–F4 fixes land. Four rounds of review have cumulatively surfaced:
+Status reflects the current shipping state of the project. **v0 is green** — all blockers, input-validation issues, privacy fixes, and fuzz-gate items are resolved. Four rounds of review cumulatively surfaced:
 
 1. **First pass** (static read): B1–B5, F1–F7, polish — bugs visible on inspection.
 2. **Second pass** (re-read against the v0 plan): N1–N5 — conflicts between roadmap items, plus deferred N6–N9.
@@ -11,7 +11,10 @@ Status reflects the current shipping state of the project. v0 is **yellow, not g
 
 Estimate: **~2 days of work** to ship-green, including tests. (Originally estimated as half a day; corrected after each subsequent pass found more.) The rate-of-discovery has not yet slowed: every pass finds bugs the previous pass missed. **Strong recommendation:** before tagging v0, add a fuzz/property-test harness over `bin/okm` covering Unicode/quotes/slashes/newlines/empty/long inputs to all subcommands. Otherwise this is whack-a-mole.
 
-**Current state note:** Suite is green (292 tests, 0 failures) as of this writing. [N25](#fourth-pass-findings) is now resolved — `install_direnv` is implemented in `setup-km.sh` and `tests/direnv.bats` passes. The "EDITOR is set to nvim" test was rewritten so it no longer breaks when the parent shell exports `EDITOR=vim` (the previous version asserted on `EDITOR == nvim` after sourcing `env.sh`, which by design preserves a pre-set `EDITOR`). Roadmap items below are still open; this note tracks only suite health.
+**Current state note:** Suite is green (403 tests, 0 failures) as of this writing. All v0 items are shipped.
+
+5. **Fifth pass** (post-fix adversarial review): N26–N29 — bugs in the v0 fixes themselves: YAML backslash escaping, `-t` flag injection bypass, `resolve_note` path traversal, `.git/` leak in `list_notes`.
+6. **Sixth pass** (edge-case deep dive): N30–N31 — `has_frontmatter` single-`---` false positive causing silent tag-write failure, `mktemp`+`mv` clobbering file permissions. *Documented, deferred to v1.*
 
 ## Scope by Version
 
@@ -19,38 +22,46 @@ Active planning horizon. Anything beyond v2 is intentionally undefined — focus
 
 | Item | v0 (ship-green) | v1 (post-ship cleanup) | v2 (next feature wave) |
 |---|---|---|---|
-| **B1** wikilink rewriter substring bug ([details](#pre-v0-blockers)) | ✅ required | | |
-| **B2** `okm tagged` partial-match bug ([details](#pre-v0-blockers)) | ✅ required | | |
-| **B3** block-style YAML tags hard-fail ([details](#pre-v0-blockers)) | ✅ required (hard-fail) | read support | |
-| **B4** tag-name validation ([details](#pre-v0-blockers)) | ✅ required | | |
-| **B5** vault `.gitignore` covers secrets ([details](#pre-v0-blockers)) | ✅ required | `okm sync` confirms uncommon extensions | |
-| **F3** `okm today` ↔ `daily-template.md` alignment ([details](#known-bugs)) | ✅ required | | |
-| **F4** WSL2 registry/font disclosure + flag gate ([details](#known-bugs)) | ✅ required | | |
-| **N1** templates → inline YAML so B3 doesn't fire on demo dataset ([details](#second-pass-findings)) | ✅ required | block-style read support | |
-| **N2** Format Specification drift across 4 producers ([details](#second-pass-findings)) | ✅ required (broaden F3) | | |
-| **N3** vault `.gitignore` template ignores `private-*/*.md` when `KM_TRACK_NOTES=false` ([details](#second-pass-findings)) | ✅ required | | |
-| **N4** README platform-support row says "Debian/Ubuntu" not "Linux" ([details](#second-pass-findings)) | ✅ required (1-line doc) | | |
-| **N5** `gitignore.bats` test updated for F5 dead-rule removal ([details](#second-pass-findings)) | ✅ required (paired with F5) | | |
-| **N10** `okm tag` sed-delimiter break on hierarchical tags (`source/podcast`) ([details](#third-pass-findings)) | ✅ required | | |
-| **N11** `okm tag` silent success on frontmatter-less files ([details](#third-pass-findings)) | ✅ required | | |
-| **N12** privacy leak — `okm grep`/`tags`/`files`/`tagged`/`recent` read `private-*/` ([details](#third-pass-findings)) | ✅ required | richer `okm private <subcmd>` namespace | |
-| **N13** `okm new` corrupts YAML when title contains `"` ([details](#third-pass-findings)) | ✅ required | | |
-| **N14** `slugify` strips non-ASCII to empty/colliding strings ([details](#third-pass-findings)) | ✅ required (validate, not transliterate) | transliteration via `iconv` | |
-| **N15** `okm sync` follows symlinks; commits paths to `/etc/passwd` etc. ([details](#third-pass-findings)) | ✅ required | | |
-| **N16** `okm spot` with truncated URL produces polluted note instead of erroring ([details](#fourth-pass-findings)) | ✅ required | | |
-| **N17** `okm tagged <regex>` is regex injection (`okm tagged ".*"` matches all) ([details](#fourth-pass-findings)) | ✅ required (folds into B2) | | |
-| **N18** `okm new` with overly long title hits `File name too long` ([details](#fourth-pass-findings)) | ✅ required | | |
-| **N19** `okm open` allows path traversal — opens any path on the filesystem ([details](#fourth-pass-findings)) | ✅ required | | |
-| **N20** `okm new` with newline in title creates a file with embedded newlines in its name ([details](#fourth-pass-findings)) | ✅ required | | |
-| **N21** `get_tags_line` matches `tags:` inside body `---...---` blocks → corruption ([details](#fourth-pass-findings)) | ✅ required | | |
-| **N22** tag dedup uses `grep -qxF "$t"` — flag injection on tags starting with `-` ([details](#fourth-pass-findings)) | ✅ required (1-line) | | |
-| **N23** `okm tag` accepts `]` and writes invalid YAML — confirms B4 is currently unguarded ([details](#fourth-pass-findings)) | ✅ required (folds into B4) | | |
-| **N24** `okm files <pattern>` is substring grep, not glob — `okm files "*.md"` returns nothing ([details](#fourth-pass-findings)) | ✅ required (1-line doc or glob impl) | | |
-| **N25** CI red — `tests/direnv.bats` tests unimplemented `install_direnv()` ([details](#fourth-pass-findings)) | ✅ required (decide implement vs delete) | | |
-| Fuzz/property-test harness over `bin/okm` (final gate before v0 tag) ([details](#fourth-pass-findings)) | ✅ required | | |
+| **B1** wikilink rewriter substring bug ([details](#pre-v0-blockers)) | ✅ shipped | | |
+| **B2** `okm tagged` partial-match bug ([details](#pre-v0-blockers)) | ✅ shipped | | |
+| **B3** block-style YAML tags hard-fail ([details](#pre-v0-blockers)) | ✅ shipped | read support | |
+| **B4** tag-name validation ([details](#pre-v0-blockers)) | ✅ shipped | | |
+| **B5** vault `.gitignore` covers secrets ([details](#pre-v0-blockers)) | ✅ shipped | `okm sync` confirms uncommon extensions | |
+| **F3** `okm today` ↔ `daily-template.md` alignment ([details](#known-bugs)) | ✅ shipped | | |
+| **F4** WSL2 registry/font disclosure + flag gate ([details](#known-bugs)) | ✅ shipped | | |
+| **N1** templates → inline YAML so B3 doesn't fire on demo dataset ([details](#second-pass-findings)) | ✅ shipped | block-style read support | |
+| **N2** Format Specification drift across 4 producers ([details](#second-pass-findings)) | ✅ shipped | | |
+| **N3** vault `.gitignore` template ignores `private-*/*.md` when `KM_TRACK_NOTES=false` ([details](#second-pass-findings)) | ✅ shipped | | |
+| **N4** README platform-support row says "Debian/Ubuntu" not "Linux" ([details](#second-pass-findings)) | ✅ shipped | | |
+| **N5** `gitignore.bats` test updated for F5 dead-rule removal ([details](#second-pass-findings)) | ✅ shipped | | |
+| **N10** `okm tag` sed-delimiter break on hierarchical tags (`source/podcast`) ([details](#third-pass-findings)) | ✅ shipped | | |
+| **N11** `okm tag` silent success on frontmatter-less files ([details](#third-pass-findings)) | ✅ shipped | | |
+| **N12** privacy leak — `okm grep`/`tags`/`files`/`tagged`/`recent` read `private-*/` ([details](#third-pass-findings)) | ✅ shipped | richer `okm private <subcmd>` namespace | |
+| **N13** `okm new` corrupts YAML when title contains `"` ([details](#third-pass-findings)) | ✅ shipped | | |
+| **N14** `slugify` strips non-ASCII to empty/colliding strings ([details](#third-pass-findings)) | ✅ shipped | transliteration via `iconv` | |
+| **N15** `okm sync` follows symlinks; commits paths to `/etc/passwd` etc. ([details](#third-pass-findings)) | ✅ shipped | | |
+| **N16** `okm spot` with truncated URL produces polluted note instead of erroring ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N17** `okm tagged <regex>` is regex injection (`okm tagged ".*"` matches all) ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N18** `okm new` with overly long title hits `File name too long` ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N19** `okm open` allows path traversal — opens any path on the filesystem ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N20** `okm new` with newline in title creates a file with embedded newlines in its name ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N21** `get_tags_line` matches `tags:` inside body `---...---` blocks → corruption ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N22** tag dedup uses `grep -qxF "$t"` — flag injection on tags starting with `-` ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N23** `okm tag` accepts `]` and writes invalid YAML — confirms B4 is currently unguarded ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N24** `okm files <pattern>` is substring grep, not glob — `okm files "*.md"` returns nothing ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N25** CI red — `tests/direnv.bats` tests unimplemented `install_direnv()` ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **Fork safety** — README quickstart + `setup-km.sh` instruct users to fork/rename to `{github-handle}-knowledge-management` and reset the git remote before first `okm sync`, so private notes can't accidentally land in the OSS upstream | ✅ shipped | | |
+| **Sensitive-data audit** — `okm audit` subcommand: scans codebase + vault for PARA content, secret patterns, and sensitive filenames; exits non-zero on findings. Pre-share gate before publishing the codebase or contributing harnesses upstream. Full CLI surface in [Ship Plan step 4](#recommended-ship-plan). | ✅ shipped | `--json` output + pre-commit hook integration | |
+| Fuzz/property-test harness over `bin/okm` (final gate before v0 tag) ([details](#fourth-pass-findings)) | ✅ shipped | | |
+| **N26** `yaml_escape_dq` doesn't escape `\` — YAML interprets `\n` in titles ([details](#fifth-pass-findings)) | ✅ shipped | | |
+| **N27** `-t` flag values bypass `validate_tag` — direct YAML injection ([details](#fifth-pass-findings)) | ✅ shipped | | |
+| **N28** `resolve_note` has no vault-boundary check — `okm tag` path traversal ([details](#fifth-pass-findings)) | ✅ shipped | | |
+| **N29** `list_notes` doesn't exclude `.git/` — `okm files` leaks internals ([details](#fifth-pass-findings)) | ✅ shipped | | |
+| **N30** `has_frontmatter` misidentifies leading `---` (horizontal rule) as frontmatter — silent no-op on tag write ([details](#sixth-pass-findings)) | | ✅ v1 | |
+| **N31** `write_tags_line` clobbers file permissions via `mktemp` + `mv` (644 → 600) ([details](#sixth-pass-findings)) | | ✅ v1 | |
 | **F1** `okm spot` metadata fetch (use `spotdl meta` or `yt-dlp`) | | ✅ | |
 | **F2** Offline Mode table notes `okm spot` networked | | ✅ | |
-| **F5** drop dead `inbox/*-template.md` negation in `.gitignore` | | ✅ | |
+| **F5** drop dead `inbox/*-template.md` negation in `.gitignore` | ✅ shipped | | |
 | **F6** `KM_TRACK_NOTES` default unified to `true` everywhere | | ✅ | |
 | **F7** decouple cron tests from README strings | | ✅ | |
 | **Tagging** `okm rename-tag <old> <new>` | | ✅ | |
@@ -77,6 +88,7 @@ Active planning horizon. Anything beyond v2 is intentionally undefined — focus
 | `#inline-tags` body scanning (Obsidian-style) | | | ✅ |
 | Tag aliasing | | | ✅ |
 | Hierarchical tags (`source/spotify`) — already work via convention; promote to first-class | | | ✅ |
+| **Rust mirror** — slow Bash/Python utilities (fuzz harness, `okm audit` scanner, large TODO scans) ported to a lower-level language for speed once their patterns stabilize. See [Performance Policy](#performance-policy). | | | ✅ |
 
 **v0 exit criteria:** every row marked ✅ under v0 is checked off, full BATS suite green, CI green on `main`.
 
@@ -84,7 +96,7 @@ Active planning horizon. Anything beyond v2 is intentionally undefined — focus
 
 Discovered on a deeper re-review of the codebase against the v0 roadmap. These are gaps the first critique missed — adding them to v0 because they either invalidate other v0 fixes or mislead users on day one.
 
-- [ ] **N1. Templates use block-style YAML that B3's hard-fail will reject.**
+- [x] **N1. Templates use block-style YAML that B3's hard-fail will reject.** *(Shipped — all 4 templates converted to inline-array form.)*
 
   4 of 10 first-party templates ship with multi-line YAML tag lists:
   ```yaml
@@ -98,7 +110,7 @@ Discovered on a deeper re-review of the codebase against the v0 roadmap. These a
 
   **Minimal fix:** rewrite all 4 templates to inline-array form (`tags: [source/youtube, topic/your-topic]`). Zero CLI changes needed. v1 can add block-style read support and a `--migrate-tags` command.
 
-- [ ] **N2. Format Specification drift across 4 producers — the contract is a lie in 4 places.**
+- [x] **N2. Format Specification drift across 4 producers — the contract is a lie in 4 places.** *(Shipped — all 4 producers now emit the full section set from their template.)*
 
   The `<!-- Format Specification: ... -->` block on each template documents the sections the producer is supposed to emit. Today, four producers don't honour it:
 
@@ -115,7 +127,7 @@ Discovered on a deeper re-review of the codebase against the v0 roadmap. These a
 
   **Alternative:** shrink each template's `Required sections:` line to match what the CLI emits today. Cheaper but loses the "rich note" intent of the Format Specifications.
 
-- [ ] **N3. Vault `.gitignore` doesn't ignore `private-*/*.md` even when `KM_TRACK_NOTES=false`.**
+- [x] **N3. Vault `.gitignore` doesn't ignore `private-*/*.md` even when `KM_TRACK_NOTES=false`.** *(Shipped — `setup-km.sh:ensure_gitignore` now writes `private-{daily,inbox,archive}/*.md` and `private-attachments/*` rules.)*
 
   `setup-km.sh:ensure_gitignore` writes:
   ```
@@ -134,13 +146,13 @@ Discovered on a deeper re-review of the codebase against the v0 roadmap. These a
   ```
   Plus a one-liner in the README's **Rules** section: "Private folders are local-by-default. Opt them into git by removing the `private-*/*.md` lines from the vault `.gitignore`."
 
-- [ ] **N4. Platform support row says "Linux (apt + Flatpak)" but `setup-km.sh` is Debian/Ubuntu-only.**
+- [x] **N4. Platform support row says "Linux (apt + Flatpak)" but `setup-km.sh` is Debian/Ubuntu-only.** *(Shipped — README:68 reads "Debian/Ubuntu (apt + Flatpak).")*
 
   `install_apt_packages` calls `dpkg -s` and `sudo apt update`. Fedora/Arch/openSUSE users hit hard failure on the first install step. The README's stack table reads as if any Linux is supported.
 
   **Minimal fix:** change `**Platform support:** Linux (apt + Flatpak)` to `**Platform support:** Debian/Ubuntu (apt + Flatpak)`. Add a one-line note pointing non-Debian Linux users to the macOS-support roadmap row as a tracking issue.
 
-- [ ] **N5. `gitignore.bats` couples to the dead `!inbox/*-template.md` rule that [F5](#known-bugs) removes.**
+- [x] **N5. `gitignore.bats` couples to the dead `!inbox/*-template.md` rule that [F5](#known-bugs) removes.** *(Shipped — dead rule removed from `.gitignore`; test updated to assert `!inbox/templates/`.)*
 
   ```
   @test "template files are exempted from inbox ignore" {
@@ -163,7 +175,7 @@ Discovered on a deeper re-review of the codebase against the v0 roadmap. These a
 
 These were not visible from reading the code alone — they only surface when you run the CLI with the kind of inputs real users actually type. Reproductions performed against the current `bin/okm` in this repo.
 
-- [ ] **N10. `okm tag <note> source/podcast` errors silently with `sed: unknown option to 's'`.**
+- [x] **N10. `okm tag <note> source/podcast` errors silently with `sed: unknown option to 's'`.** *(Shipped — `write_tags_line` uses awk instead of sed, no delimiter conflicts.)*
 
   Reproduction:
   ```
@@ -177,7 +189,7 @@ These were not visible from reading the code alone — they only surface when yo
 
   **Minimal fix:** use a sed delimiter that doesn't appear in tag values (e.g. `s|^tags:.*$|${new_yaml}|` with `|`), and drop the `|` from the validated tag-character set in [B4](#pre-v0-blockers). Same change applies to `remove_tags`.
 
-- [ ] **N11. `okm tag` on a file with no YAML frontmatter prints success but does nothing.**
+- [x] **N11. `okm tag` on a file with no YAML frontmatter prints success but does nothing.** *(Shipped — `add_tags` prepends a frontmatter block; `untag` prints "No tags to remove".)*
 
   Reproduction:
   ```
@@ -191,7 +203,7 @@ These were not visible from reading the code alone — they only surface when yo
 
   **Minimal fix:** detect the no-frontmatter case explicitly (`! grep -q '^---$' "$file"`) and either (a) prepend a frontmatter block, or (b) refuse with a clear error pointing at `okm new` for note creation.
 
-- [ ] **N12. `okm grep`, `okm tags`, `okm files`, `okm tagged`, and `okm recent` all read `private-*/` indiscriminately.**
+- [x] **N12. `okm grep`, `okm tags`, `okm files`, `okm tagged`, and `okm recent` all read `private-*/` indiscriminately.** *(Shipped in commit `5c97690`. Read-side commands now skip `private-*/` by default; `KM_INCLUDE_PRIVATE=1` opts in.)*
 
   Reproduction:
   ```
@@ -210,7 +222,7 @@ These were not visible from reading the code alone — they only surface when yo
 
   **Minimal fix (v0):** every read-side helper (`grep_vault`, `files_vault`, `list_notes`, `list_tags`, `list_tagged`, `recent_notes`) gains a default exclude `--glob '!private-*/'`. Add an `okm --include-private <subcmd>` flag (or a `okm private <subcmd>` subnamespace in v1) for the explicit opt-in case. Document the new default in the **Rules** section.
 
-- [ ] **N13. `okm new "..."` with a double-quoted title produces invalid YAML.**
+- [x] **N13. `okm new "..."` with a double-quoted title produces invalid YAML.** *(Shipped — `yaml_escape_dq` escapes `"` to `\"` in YAML scalars for `new_note` and `spot_note`.)*
 
   Reproduction:
   ```
@@ -223,7 +235,7 @@ These were not visible from reading the code alone — they only surface when yo
 
   **Minimal fix:** in every heredoc that interpolates user strings into YAML, escape `"` to `\"` (or render as a single-quoted YAML scalar with `'` doubled). One-line shell function: `yaml_quote() { printf '%s' "${1//\"/\\\"}"; }`.
 
-- [ ] **N14. `slugify` strips non-ASCII characters to empty, producing collisions and zero-length filenames.**
+- [x] **N14. `slugify` strips non-ASCII characters to empty, producing collisions and zero-length filenames.** *(Shipped — `slugify` fails-closed with an error when slug < 2 chars.)*
 
   Reproduction:
   ```
@@ -238,7 +250,7 @@ These were not visible from reading the code alone — they only surface when yo
 
   **Minimal fix (v0, conservative):** if `slugify` returns empty or fewer than 2 chars, exit non-zero with "Title produces empty slug — use ASCII letters/digits or pass `--slug <explicit>`". v1 can add `iconv -f UTF-8 -t ASCII//TRANSLIT` for transliteration.
 
-- [ ] **N15. `okm sync` follows symlinks; a symlink in the vault to `/etc/passwd` (or any external file) is committed to git history.**
+- [x] **N15. `okm sync` follows symlinks; a symlink in the vault to `/etc/passwd` (or any external file) is committed to git history.** *(Shipped — `okm sync` refuses external symlinks; `setup-km.sh` sets `core.symlinks=false`.)*
 
   Reproduction:
   ```
@@ -256,7 +268,7 @@ These were not visible from reading the code alone — they only surface when yo
 
 Adversarial-input round. Reproductions performed against the current `bin/okm` in this repo. The pattern: every pass finds bugs the previous pass missed, so this list closes with a recommendation to add a fuzz harness before tagging v0.
 
-- [ ] **N16. `okm spot https://open.spotify.com/track/` (no ID) and `okm spot https://open.spotify.com/` create polluted notes instead of erroring.**
+- [x] **N16. `okm spot https://open.spotify.com/track/` (no ID) and `okm spot https://open.spotify.com/` create polluted notes instead of erroring.** *(Shipped — Spotify ID validated as 10+ alphanumeric chars after extraction.)*
 
   Reproduction:
   ```
@@ -269,7 +281,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
 
   **Minimal fix:** after the spot_id regex, validate `[ -n "$spot_id" ] && [[ "$spot_id" =~ ^[a-zA-Z0-9]{20,}$ ]]`. Refuse with a clear error otherwise.
 
-- [ ] **N17. `okm tagged <pattern>` interpolates the tag name into a ripgrep regex unescaped — regex injection.**
+- [x] **N17. `okm tagged <pattern>` interpolates the tag name into a ripgrep regex unescaped — regex injection.** *(Shipped — `list_tagged` uses parsed-tag equality via `validate_tag` + `grep -qxF`.)*
 
   Reproduction:
   ```
@@ -281,7 +293,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
   ```
   Folds into [B2](#pre-v0-blockers)'s scope: replacing the regex search with parsed-tag equality fixes both the boundary bug (B2) and the injection (N17) in one rewrite.
 
-- [ ] **N18. `okm new "<very-long-title>"` aborts with `File name too long` from the OS.**
+- [x] **N18. `okm new "<very-long-title>"` aborts with `File name too long` from the OS.** *(Shipped — `slugify` caps at 200 chars.)*
 
   Reproduction (4096-char title):
   ```
@@ -292,7 +304,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
 
   **Minimal fix:** after `slug=$(slugify "$title")`, if `${#slug} -gt 200`, exit non-zero with "Title slug too long (${#slug} chars; max 200) — use `--slug <short>`".
 
-- [ ] **N19. `okm open <relative-or-absolute-path>` allows path traversal — opens any file on the filesystem.**
+- [x] **N19. `okm open <relative-or-absolute-path>` allows path traversal — opens any file on the filesystem.** *(Shipped — `open_note` resolves `realpath` and refuses paths outside the vault.)*
 
   Reproduction:
   ```
@@ -313,7 +325,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
 
   **Minimal fix:** before exec, resolve `realpath(target)` and verify it is a prefix of `realpath(VAULT)`. Refuse otherwise. Add `--external` flag for the rare opt-out case.
 
-- [ ] **N20. `okm new "$(printf 'multi\\nline\\ntitle')"` creates a file with embedded newlines in its name.**
+- [x] **N20. `okm new "$(printf 'multi\\nline\\ntitle')"` creates a file with embedded newlines in its name.** *(Shipped — `slugify` collapses `\n\r\t` to spaces before processing.)*
 
   Reproduction:
   ```
@@ -327,7 +339,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
 
   **Minimal fix:** in `slugify`, prepend `tr '\n\r\t' '   '` to collapse vertical whitespace before substitution. Or: validate that `$title` is a single line and refuse otherwise.
 
-- [ ] **N21. `get_tags_line` matches `tags:` inside body `---...---` blocks — silent data corruption when adding/removing tags on notes with horizontal rules.**
+- [x] **N21. `get_tags_line` matches `tags:` inside body `---...---` blocks — silent data corruption when adding/removing tags on notes with horizontal rules.** *(Shipped — `first_frontmatter` awk helper restricts parsing to the first `---...---` block.)*
 
   Reproduction:
   ```
@@ -351,7 +363,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
 
   **Minimal fix:** restrict frontmatter parsing to the very first `---...---` block. Use `awk '/^---$/{c++; if (c>2) exit; next} c==1' "$file"` or equivalent. Update `get_tags_line`, `add_tags`, and `remove_tags` to share that helper.
 
-- [ ] **N22. Tag dedup uses `grep -qxF "$t"` — `grep` interprets a tag starting with `-` as a flag.**
+- [x] **N22. Tag dedup uses `grep -qxF "$t"` — `grep` interprets a tag starting with `-` as a flag.** *(Shipped — `grep -qxF -- "$t"` with `--` to terminate option parsing.)*
 
   Reproduction:
   ```
@@ -363,7 +375,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
 
   **Minimal fix:** `grep -qxF -- "$t"` (use `--` to terminate option parsing). One-character change.
 
-- [ ] **N23. `okm tag` accepts `]` in tag values, producing invalid YAML — live confirmation that [B4](#pre-v0-blockers) is currently unguarded.**
+- [x] **N23. `okm tag` accepts `]` in tag values, producing invalid YAML — live confirmation that [B4](#pre-v0-blockers) is currently unguarded.** *(Shipped — `validate_tag` rejects `]`, `[`, `,`, `:`, `"`, whitespace, and `|`.)*
 
   Reproduction:
   ```
@@ -376,7 +388,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
   ```
   The reject pattern in B4 must include `]`, `[`, `,`, `:`, `"`, and whitespace. This is also why N17/B2's "use parsed equality, not regex" fix is necessary — a tag containing `]` would also break a literal regex match.
 
-- [ ] **N24. `okm files <pattern>` is substring grep, not glob — `okm files "*.md"` returns nothing.**
+- [x] **N24. `okm files <pattern>` is substring grep, not glob — `okm files "*.md"` returns nothing.** *(Shipped — documented as `okm files [substring]` in usage; literal case-insensitive substring match.)*
 
   Reproduction:
   ```
@@ -390,7 +402,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
 
   **Minimal fix (cheapest):** rewrite the README row to say "filtered by literal substring (case-insensitive)". **Better:** accept globs via `find -name "$pattern"` instead of `grep`. Either is fine; pick one and document it.
 
-- [ ] **N25. CI is currently red — `tests/direnv.bats` references an `install_direnv()` that doesn't exist in `setup-km.sh`.**
+- [x] **N25. CI is currently red — `tests/direnv.bats` references an `install_direnv()` that doesn't exist in `setup-km.sh`.** *(Shipped — `install_direnv` is implemented; `tests/direnv.bats` passes; suite is green.)*
 
   Reproduction:
   ```
@@ -407,7 +419,7 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
 
   **Minimal fix:** decide whether `install_direnv` is in v0 scope. If yes, implement it (write the direnv hook to `~/.bashrc` only, idempotently, gated by direnv being on PATH). If no, delete `tests/direnv.bats`. Either way, the suite must be green before any other v0 work tags.
 
-- [ ] **Fuzz / property-test harness over `bin/okm`.**
+- [x] **Fuzz / property-test harness over `bin/okm`.** *(Shipped — `tests/fuzz.bats` with 30 adversarial-input tests covering all user-facing subcommands.)*
 
   Every review pass has found bugs the previous pass missed (B-series → F-series → N1-9 → N10-15 → N16-24). The arrival rate hasn't slowed. Before tagging v0, add a small property test that throws random Unicode/quotes/slashes/newlines/empty/long strings at:
   - `okm new <title>`
@@ -423,11 +435,43 @@ Adversarial-input round. Reproductions performed against the current `bin/okm` i
 
   This is the only v0 item that needs a new bit of infrastructure rather than a 1-to-15-line patch. Worth half a day.
 
+## Fifth-pass findings
+
+Post-fix adversarial review — bugs in the v0 fixes themselves. Found by re-running the same adversarial-input methodology against the patched codebase.
+
+- [x] **N26. `yaml_escape_dq` only escapes `"` but not `\` — YAML double-quoted scalars interpret backslash escape sequences.** *(Shipped — escapes `\` to `\\` before `"` to `\"`.)*
+
+  Reproduction: `okm new 'test\note'` wrote `title: "test\note"`. A YAML parser reads `\n` as a newline, so the title becomes `test` + newline + `ote`. Affects any downstream consumer: Obsidian metadata, `parse_tags`, scripts.
+
+- [x] **N27. `-t` flag values bypass `validate_tag` in `new_note`, `capture_note`, and `spot_note` — direct YAML injection.** *(Shipped — `parse_tag_flag` splits on `,` and validates each tag.)*
+
+  Reproduction: `okm new "test" -t "evil], injected: true"` wrote `tags: [evil], injected: true]` — corrupt YAML. The B4 tag validation was only wired into `add_tags`/`remove_tags`, not the `-t` flag path.
+
+- [x] **N28. `resolve_note` has no vault-boundary check — `okm tag /etc/hostname newtag` modifies files outside the vault.** *(Shipped — `resolve_note` checks `realpath` against vault root.)*
+
+  Reproduction: `okm tag /tmp/outside-vault.md newtag` wrote frontmatter to an external file. The N19 path-traversal fix was applied only to `open_note`; `tag`, `untag`, and `tags` all use `resolve_note` without the same guard.
+
+- [x] **N29. `list_notes` doesn't exclude `.git/` — `okm files` and `okm open` (fzf) can expose `.git/` internal `.md` files.** *(Shipped — added `-not -path '*/.git/*'` to `list_notes`.)*
+
+  Reproduction: placed a `.md` file inside `.git/refs/`; `okm files` listed it. `list_vault_md_files` had the exclusion but `list_notes` (used by `files` and `open`) did not.
+
+## Sixth-pass findings
+
+Deeper adversarial review of the fixes themselves — probing edge cases in `has_frontmatter`, `write_tags_line`, and `mktemp` semantics.
+
+- [ ] **N30. `has_frontmatter` only checks the first line — a file starting with `---` (horizontal rule) is misidentified as having frontmatter, causing `write_tags_line` to silently no-op.** *(Known — deferred to v1.)*
+
+  Reproduction: `okm tag inbox/hr-at-top.md newtag` prints "Tagged:" success but the file is unchanged — `write_tags_line`'s awk can't find a second `---` so the tags are never written. Fix: `has_frontmatter` should verify both opening AND closing `---`.
+
+- [ ] **N31. `write_tags_line` and the frontmatter-prepend code use `mktemp` + `mv`, which clobbers file permissions (644 → 600).** *(Known — deferred to v1.)*
+
+  Reproduction: `ls -la` before and after `okm tag` shows permissions changing from `-rw-r--r--` (644) to `-rw-------` (600). Every `okm tag`/`untag` operation silently tightens permissions. Fix: capture permissions via `stat` before the rewrite; `chmod` to restore after.
+
 ## Pre-v0 Blockers
 
 Must fix before tagging v0. These are correctness bugs that will bite real users in week one.
 
-- [ ] **B1. `compress-images.py` — wikilink rewriter does substring match, not boundary match.**
+- [x] **B1. `compress-images.py` — wikilink rewriter does substring match, not boundary match.** *(Shipped — `_build_link_patterns` at `scripts/compress-images.py:41` builds bounded regex for `![[...]]` and `[](...)`; `tests/compress_images.bats:35` covers the `foo.png` vs `super-foo.png` adjacency case.)*
   ```
               updated = content.replace(old_name, new_name)
   ```
@@ -435,7 +479,7 @@ Must fix before tagging v0. These are correctness bugs that will bite real users
 
   **Minimal fix:** replace only inside `![[...]]` and `[](...)` link contexts, e.g. via a regex like `r"!\[\[" + re.escape(old) + r"\]\]"` (and the `[](path)` form too).
 
-- [ ] **B2. `okm tagged` matches partial tags via faulty word boundary.**
+- [x] **B2. `okm tagged` matches partial tags via faulty word boundary.** *(Shipped — `list_tagged` uses parsed-tag equality instead of regex.)*
   ```
     rg -l --glob '*.md' --glob '!.git/' "^tags:.*\\b${tag}\\b" "$VAULT" 2>/dev/null \
       | sed "s#^$VAULT/##" | sort
@@ -444,7 +488,7 @@ Must fix before tagging v0. These are correctness bugs that will bite real users
 
   **Minimal fix:** match on the tokenised list instead of regex against the line, or anchor with delimiters present in the inline-array form: `[, ]`. Easiest correct version: parse tags per file with `parse_tags` and compare equality.
 
-- [ ] **B3. `okm tag`/`untag` only handle inline-array YAML; multi-line lists are silently broken.**
+- [x] **B3. `okm tag`/`untag` only handle inline-array YAML; multi-line lists are silently broken.** *(Shipped — `has_block_style_tags` detects block style; `require_inline_tags` hard-fails with a clear message.)*
   ```
   parse_tags() {
     local line="$1"
@@ -462,7 +506,7 @@ Must fix before tagging v0. These are correctness bugs that will bite real users
 
   **Minimal fix:** detect block style (next line begins with `- `) and either (a) refuse with a clear error and a hint to switch to inline, or (b) normalise on read.
 
-- [ ] **B4. No tag-name validation — users will break their own YAML.**
+- [x] **B4. No tag-name validation — users will break their own YAML.** *(Shipped — `validate_tag` rejects chars outside `[A-Za-z0-9_./+-]`.)*
   `okm tag mynote "machine learning"` writes:
   ```yaml
   tags: [machine learning]
@@ -471,7 +515,7 @@ Must fix before tagging v0. These are correctness bugs that will bite real users
 
   **Minimal fix:** in `add_tags`, reject tag values matching `[[:space:],\[\]:\"]` with a one-line error. ~3 lines.
 
-- [ ] **B5. `git add -A` in `okm sync` is dangerous on a shared vault.**
+- [x] **B5. `git add -A` in `okm sync` is dangerous on a shared vault.** *(Shipped — vault `.gitignore` now excludes `.env*`, `*.pem`, `*.key`, `*.crt`, `*credentials*`, `id_rsa*`, `id_ed25519*`, and `private-*/` content.)*
   ```
     git -C "$VAULT" add -A
   ```
@@ -494,12 +538,12 @@ Functional, lower severity than blockers. Tracked but do not block v0 sign-off o
 - [ ] **F2. `okm spot` makes a network call but README claims "offline by default".**
   `spotdl save` hits the Spotify API. `setup-km.sh` revokes Obsidian's network but leaves `okm spot` networked. That's defensible — you opt in by running `okm spot` — but the README's "Offline Mode" table doesn't mention this asymmetry. Worth one line under that table.
 
-- [ ] **F3. `okm today` template diverges from `daily-template.md`.**
+- [x] **F3. `okm today` template diverges from `daily-template.md`.** *(Shipped — all 4 producers now emit the full section set specified in their template's Format Specification.)*
   `bin/okm today_note()` hardcodes `## Tasks` + `## Notes`, but `inbox/templates/daily-template.md` requires `Captures`, `Notes`, `Tasks`, `Reflection`. The Format Specification block on the template lies about what gets produced. Either:
   - have `today_note()` render the template (preferred — tests already validate template structure), or
   - shrink the template to match the CLI.
 
-- [ ] **F4. `setup-km.sh` modifies Windows registry on WSL2 but README says "no global config files were modified".**
+- [x] **F4. `setup-km.sh` modifies Windows registry on WSL2 but README says "no global config files were modified".** *(Shipped — README Rules discloses WSL2 font/registry writes; font install gated behind `KM_INSTALL_FONT=0`.)*
   ```
           powershell.exe -c '
               $fontDir = "$env:LOCALAPPDATA\Microsoft\Windows\Fonts"
@@ -508,7 +552,7 @@ Functional, lower severity than blockers. Tracked but do not block v0 sign-off o
   ```
   Plus mutates `Microsoft.WindowsTerminal_*\settings.json`. These are real, persistent, user-visible changes. The README's "Your ~/.zshrc, ~/.config/nvim, and ~/.config/lazygit are untouched" is technically accurate but materially misleading for WSL2 users. Add one line under **Rules** disclosing this, and gate it behind a prompt or `KM_INSTALL_FONT=1`.
 
-- [ ] **F5. Project-root `.gitignore` has a dead rule.**
+- [x] **F5. Project-root `.gitignore` has a dead rule.** *(Shipped — `!inbox/*-template.md` negation removed.)*
   ```
   # Personal notes (vault content should not live in the tooling repo)
   inbox/*.md
@@ -537,9 +581,9 @@ Functional, lower severity than blockers. Tracked but do not block v0 sign-off o
 
 The skeleton is there but it's not safe at the scale of "I'll tag thousands of notes and refactor the taxonomy in a year". Minimal additions for v0:
 
-- [ ] **Fix the substring-match bug** ([B2](#pre-v0-blockers)) — non-negotiable.
-- [ ] **Reject invalid tag chars** ([B4](#pre-v0-blockers)) — non-negotiable, ~3 lines.
-- [ ] **Detect block-style YAML and bail with a clear error** ([B3](#pre-v0-blockers)) — could be a hard-fail in v0, with v0.1 adding read support.
+- [x] **Fix the substring-match bug** ([B2](#pre-v0-blockers)) — non-negotiable.
+- [x] **Reject invalid tag chars** ([B4](#pre-v0-blockers)) — non-negotiable, ~3 lines.
+- [x] **Detect block-style YAML and bail with a clear error** ([B3](#pre-v0-blockers)) — could be a hard-fail in v0, with v0.1 adding read support.
 - [ ] **Add `okm rename-tag <old> <new>`** — single most common operation users do once they realize their tagging scheme is wrong. ~15 lines around `add_tags`/`remove_tags`.
 - [ ] **Add `-t` to `okm today`** — currently asymmetric (`new`, `capture`, `spot` accept it; `today` doesn't). Trivial.
 - [ ] **`okm tags --json`** — for piping into fzf/scripts. Optional but a 3-line addition.
@@ -562,20 +606,42 @@ Not blocking. Do later.
 
 ## Recommended Ship Plan
 
-In priority order, do these in one PR per cluster to reach green. The ordering is deliberate: clustered fixes share helpers and want one coherent rewrite each, and `private-*/` exclusion must land alongside B5+N3 for the privacy story to be coherent end-to-end. Step 11 (fuzz) is the gate.
+In priority order, do these in one PR per cluster to reach green. The ordering is deliberate: clustered fixes share helpers and want one coherent rewrite each, [N1](#second-pass-findings) must land **before** the tagging cluster so [B3](#pre-v0-blockers)'s hard-fail doesn't reject the project's own seed data the moment it ships, and the privacy-and-sharing story (vault `.gitignore` + fork rename + sensitive-data audit) lands as one coherent step. The fuzz gate is the final step.
 
-1. [B1](#pre-v0-blockers) — `compress-images.py` regex-bound wikilink replacement + adjacency-collision test.
-2. **Tagging cluster** — single rewrite of `add_tags`/`remove_tags`/`get_tags_line`/`list_tagged` covering [B2](#pre-v0-blockers) (boundary regex) ⊃ [N17](#fourth-pass-findings) (regex injection), [B3](#pre-v0-blockers) (block-style hard-fail), [B4](#pre-v0-blockers) (char validation) ⊃ [N23](#fourth-pass-findings), [N10](#third-pass-findings) (sed delimiter), [N11](#third-pass-findings) (no-frontmatter), [N21](#fourth-pass-findings) (first-block-only frontmatter parse), [N22](#fourth-pass-findings) (`grep -- "$t"`). Tests for hierarchical tags, frontmatter-less files, body-`---` notes, and tags starting with `-`.
-3. **Privacy cluster** — [N12](#third-pass-findings) excludes `private-*/` from every read-side `okm` command by default + paired with [B5](#pre-v0-blockers) and [N3](#second-pass-findings): vault `.gitignore` adds `.env*`, `*.pem`, `*.key`, `*credentials*`, `private-{daily,inbox,archive}/*.md`, `private-attachments/*`. README **Rules** updated with one line on each.
-4. **Path-safety cluster** — [N19](#fourth-pass-findings) `okm open` refuses paths outside the vault + [N15](#third-pass-findings) `core.symlinks=false` and symlink refusal in `okm sync`.
-5. **Input-validation cluster** — [N13](#third-pass-findings) escape `"` in YAML, [N14](#third-pass-findings) slugify fail-closed on empty/short slugs ⊃ [N18](#fourth-pass-findings) length cap ⊃ [N20](#fourth-pass-findings) newline collapse, [N16](#fourth-pass-findings) Spotify ID validation.
-6. **[N1](#second-pass-findings)** — convert the 4 block-style templates to inline YAML *before* B3 ships, so B3 doesn't land red on the demo dataset.
-7. **[F3](#known-bugs) widened by [N2](#second-pass-findings)** — align all 4 drifting producers (`okm today`, `okm new`, `okm spot` track, `okm spot` episode) to render their templates via placeholder substitution.
-8. [F4](#known-bugs) — README disclosure on WSL2 Windows-side writes; gate font install behind a flag.
-9. **[N4](#second-pass-findings)** — "Linux (apt + Flatpak)" → "Debian/Ubuntu (apt + Flatpak)" in the stack table.
-10. **[N5](#second-pass-findings)** — drop the dead `!inbox/*-template.md` test in `tests/gitignore.bats` once [F5](#known-bugs) removes the rule. **[N24](#fourth-pass-findings)** — clarify or fix `okm files <pattern>` semantics (literal substring vs glob) and document it.
-11. **[N25](#fourth-pass-findings)** — green CI first. Decide: implement `install_direnv` (writes `eval "$(direnv hook bash)"` to `~/.bashrc` idempotently) **or** delete `tests/direnv.bats`. Pick one, then move forward. No other work merges while CI is red.
-12. **Fuzz gate** — add a property-test harness over `bin/okm` (see [Fuzz harness](#fourth-pass-findings)). Any new bug it finds becomes a v0 fix; only after fuzz is clean does v0 tag.
+**Items already shipped** (see the Current state note for details): [B1](#pre-v0-blockers), [N1](#second-pass-findings), [N4](#second-pass-findings), [N12](#third-pass-findings), [N25](#fourth-pass-findings). Excluded from the steps below.
+
+1. **Tagging cluster** — single rewrite of `add_tags`/`remove_tags`/`get_tags_line`/`list_tagged` covering [B2](#pre-v0-blockers) (boundary regex) ⊃ [N17](#fourth-pass-findings) (regex injection), [B3](#pre-v0-blockers) (block-style hard-fail), [B4](#pre-v0-blockers) (char validation) ⊃ [N23](#fourth-pass-findings), [N10](#third-pass-findings) (sed delimiter), [N11](#third-pass-findings) (no-frontmatter), [N21](#fourth-pass-findings) (first-block-only frontmatter parse), [N22](#fourth-pass-findings) (`grep -- "$t"`). Tests for hierarchical tags, frontmatter-less files, body-`---` notes, and tags starting with `-`.
+2. **Privacy + sharing-safety cluster** — three pieces, one coherent PR so the privacy story is end-to-end:
+    - [B5](#pre-v0-blockers) + [N3](#second-pass-findings): vault `.gitignore` adds `.env*`, `*.pem`, `*.key`, `*credentials*`, `private-{daily,inbox,archive}/*.md`, `private-attachments/*`.
+    - **Fork safety**: README quickstart + `setup-km.sh` guide users to fork/rename to `{github-handle}-knowledge-management` and reset the git remote *before* the first `okm sync`, so private notes can't accidentally land in the OSS upstream.
+    - **Sensitive-data audit**: ship `okm audit` so users can verify the tree is clean before publishing the codebase or contributing harnesses upstream. CLI surface:
+
+        ```
+        okm audit                  # scan codebase + vault; print findings; exit 1 if any
+        okm audit --code-only      # skip vault scan; check only the harness (scripts/, config/, bin/, tests/, *.sh, *.md at repo root)
+        okm audit --vault-only     # skip codebase scan; check only the vault tree
+        okm audit --paths <p>...   # restrict scan to given paths (relative to repo root)
+        okm audit --quiet          # suppress per-finding output; just set exit code
+        ```
+
+        Scope — **tracked content only**: `git ls-files` ∪ staged-but-not-yet-committed paths. Untracked files are out of scope (they can't be pushed). This is also what makes the scan fast.
+
+        Coupling — **decoupled from `okm sync`**. Users invoke `okm audit` manually or wire it into a pre-commit hook (documented in README). `okm sync` does not auto-run audit, to keep the sync path fast and avoid training users to bypass with `--no-verify`.
+
+        What it flags:
+        - **PARA content** under `daily/`, `inbox/`, `archive/`, `attachments/`, `private-*/` that isn't a template (`inbox/templates/*.md`) or `demo-*` file.
+        - **Secret patterns**: AWS keys (`AKIA[0-9A-Z]{16}`), GitHub tokens (`ghp_…`, `github_pat_…`), `-----BEGIN ... PRIVATE KEY-----` blocks, generic high-entropy strings near keywords like `api_key`, `secret`, `password`, `token`.
+        - **Sensitive filenames**: `.env*`, `*.pem`, `*.key`, `*credentials*`, `id_rsa*`, `id_ed25519*`.
+        - **Personal identifiers** (warn-only, exit still 1): absolute `/home/<user>/…` paths in tracked files, the local `git config user.email` appearing outside `.git/`.
+
+        Exit codes: `0` clean · `1` findings (grouped by category, each line as `file:line: <category> <match-summary>`) · `2` invocation/usage error.
+    - README **Rules** + Quickstart updated with one line on each, and Quickstart adds an `okm audit` step before any "share this repo" guidance. ([N12](#third-pass-findings) — read-side `private-*/` exclusion — already shipped.)
+3. **Path-safety cluster** — [N19](#fourth-pass-findings) `okm open` refuses paths outside the vault + [N15](#third-pass-findings) `core.symlinks=false` and symlink refusal in `okm sync`.
+4. **Input-validation cluster** — [N13](#third-pass-findings) escape `"` in YAML, [N14](#third-pass-findings) slugify fail-closed on empty/short slugs ⊃ [N18](#fourth-pass-findings) length cap ⊃ [N20](#fourth-pass-findings) newline collapse, [N16](#fourth-pass-findings) Spotify ID validation.
+5. **[F3](#known-bugs) widened by [N2](#second-pass-findings)** — align all 4 drifting producers (`okm today`, `okm new`, `okm spot` track, `okm spot` episode) to render their templates via placeholder substitution.
+6. [F4](#known-bugs) — README disclosure on WSL2 Windows-side writes; gate font install behind a flag.
+7. **[N5](#second-pass-findings)** — drop the dead `!inbox/*-template.md` test in `tests/gitignore.bats` once [F5](#known-bugs) removes the rule. **[N24](#fourth-pass-findings)** — clarify or fix `okm files <pattern>` semantics (literal substring vs glob) and document it.
+8. **Fuzz gate** — add a property-test harness over `bin/okm` (see [Fuzz harness](#fourth-pass-findings)), written in **bats** to keep the test runner unified with the existing 292-test suite. Any new bug it finds becomes a v0 fix; only after fuzz is clean does v0 tag. (A richer property-test framework — e.g. Python `hypothesis` mirrored in Rust — is deferred to v2 per the [Performance Policy](#performance-policy).)
 
 Then it's green. Everything else (F1, F2, F5, F6, F7, N6–N9, polish) is post-ship cleanup that won't lose you a user.
 
@@ -592,6 +658,16 @@ Not yet started. Tracked separately from bug-fix work.
 - [ ] git-crypt initialisation
 - [x] GitHub Actions CI for the BATS suite
 - [ ] Private PARA mirror folder
+
+## Performance Policy
+
+Any slow scripting feature (Bash or Python) — fuzz harnesses, audit scanners, large-scale TODO scans, batch transcript processing — should be mirrored in a lower-level language (Rust preferred) once the patterns stabilize in their scripted form, so the day-to-day CLI stays compact while heavy ops scale.
+
+**Mirror when:** the script takes >1s on a typical vault, runs in a hot loop (every commit / every CI run), or is iteration-bound (e.g. property-testing with Python `hypothesis`).
+
+**Don't mirror:** one-off setup or maintenance scripts, I/O-bound work that wouldn't benefit from compilation, or anything still under active design — mirror only after the patterns are stable.
+
+The corresponding v2 scope row tracks the mirror work itself; v0 keeps everything in Bash/Python for iteration speed.
 
 ## What's Genuinely Good
 

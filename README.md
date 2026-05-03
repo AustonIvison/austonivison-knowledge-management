@@ -71,7 +71,12 @@ Offline-first personal knowledge system. Plain Markdown notes managed by the `ok
 
 ## Commands
 
+> **Fork first.** The convention is to fork and rename to `{your-github-handle}-knowledge-management` (e.g. `awsaavedra-knowledge-management`) before cloning, and clone *your fork* — not the upstream OSS — so `okm sync` pushes to your repo instead of accidentally publishing private notes to the public project. The vault and the tooling live in the same repo by default.
+
 ```bash
+# 1. On GitHub: Fork the upstream repo and rename your fork to
+#    {your-github-handle}-knowledge-management.
+# 2. Clone YOUR fork (not the upstream):
 git clone --recurse-submodules <your-fork-url> ~/projects/knowledge-management
 cd ~/projects/knowledge-management
 
@@ -224,11 +229,15 @@ Vault follows [Tiago Forte's PARA method](https://fortelabs.com/blog/para/):
 
 ## Rules
 
+- **Fork before sharing.** Always work in `{your-handle}-knowledge-management` (your fork), never the upstream OSS. `okm sync` pushes to whatever git remote `origin` points at — that's your responsibility to set correctly.
+- **`private-*/` is local-only by default.** `setup-km.sh` writes a vault `.gitignore` that excludes `private-{daily,inbox,archive}/*.md` and `private-attachments/*` regardless of `KM_TRACK_NOTES`. Opt in (e.g. with git-crypt) by removing those lines yourself.
+- **Secrets are never tracked.** The vault `.gitignore` excludes `.env*`, `*.pem`, `*.key`, `*.crt`, `*credentials*`, `id_rsa*`, and `id_ed25519*` regardless of any other setting.
 - AI assistants don't read `private-*/` paths — see `ai-instructions.md`
 - `okm grep`/`tags`/`files`/`tagged`/`recent` skip `private-*/` by default. Set `KM_INCLUDE_PRIVATE=1` to scan them. Explicit paths (`okm tags private-inbox/x.md`, `okm open private-inbox/x.md`) always work — the default only affects vault-walking commands.
 - Update the Architecture tree above after any major refactor (file moves, renames, new top-level dirs)
 - Notes are plain Markdown — no proprietary fields, no cross-tool dependencies
 - Project-scoped — never modify the user's global configs (`~/.config/nvim`, `~/.zshrc`, etc.)
+- **WSL2 note:** `setup-km.sh` installs a Nerd Font to Windows user fonts and registers it in the Windows registry (`HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts`). It may also update Windows Terminal `settings.json`. Disable with `KM_INSTALL_FONT=0` before running setup.
 - IMPORTANT: this stack is offline-first — don't introduce cloud dependencies in the core flow
 
 ---

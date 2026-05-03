@@ -24,8 +24,8 @@ setup() {
     grep -q 'inbox/\*.md' "$GITIGNORE"
 }
 
-@test "template files are exempted from inbox ignore" {
-    grep -q '!inbox/\*-template.md' "$GITIGNORE"
+@test "inbox/templates/ directory is exempted from inbox ignore" {
+    grep -q '!inbox/templates/' "$GITIGNORE"
 }
 
 @test "swap files *.swp are ignored" {

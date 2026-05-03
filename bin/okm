@@ -41,20 +41,46 @@ Usage:
   okm today
   okm spot <spotify-url> [-t tag1,tag2]
   okm grep <pattern>
-  okm files [pattern]
+  okm files [substring]
   okm recent
   okm sync [message]
   okm tags [note]
   okm tag <note> <tag> [...]
   okm untag <note> <tag> [...]
   okm tagged <tag>
+  okm audit [--code-only|--vault-only] [--paths PATH...] [--quiet]
   okm obs
   okm path
 EOF
 }
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Missing: $1" >&2; exit 1; }; }
-slugify() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'; }
+
+# N20: collapse vertical whitespace before slugifying.
+# N14: fail-closed on empty/short slugs. N18: cap at 200 chars.
+slugify() {
+  local raw
+  raw="$(printf '%s' "$1" | tr '\n\r\t' '   ')"
+  local slug
+  slug="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
+  if [ "${#slug}" -lt 2 ]; then
+    echo "Title produces empty or too-short slug — use ASCII letters/digits in the title" >&2
+    return 1
+  fi
+  if [ "${#slug}" -gt 200 ]; then
+    slug="${slug:0:200}"
+    slug="${slug%-}"
+  fi
+  printf '%s' "$slug"
+}
+
+# N13+N26: escape backslashes then double-quotes in YAML double-quoted scalars.
+# Backslash must be escaped first so we don't double-escape the quote escapes.
+yaml_escape_dq() {
+  local s="${1//\\/\\\\}"
+  printf '%s' "${s//\"/\\\"}"
+}
+
 iso_now() { date -Iseconds; }
 timestamp() { date +"%Y%m%d-%H%M%S"; }
 
@@ -62,20 +88,66 @@ ensure_dirs() {
   mkdir -p "$VAULT/$DAILY_DIR" "$VAULT/$NOTES_DIR"
 }
 
-# Extract the tags: line from a note's YAML frontmatter
-get_tags_line() {
-  local file="$1"
-  sed -n '/^---$/,/^---$/{/^tags:/p;}' "$file"
+# Tag character whitelist: ASCII letters, digits, and `_./+-`. Rejects
+# whitespace, brackets, colons, quotes, commas, pipes (sed delimiter), and
+# anything else that would break YAML or shell-flag parsing.
+# Closes B4 + N23 (invalid-char rejection) and removes the `-leading` flag
+# vector for `grep` in N22 (we still pass `--` defensively below).
+validate_tag() {
+  local tag="$1"
+  if [ -z "$tag" ]; then
+    echo "Invalid tag: empty" >&2
+    return 1
+  fi
+  if [[ ! "$tag" =~ ^[A-Za-z0-9_./+-]+$ ]]; then
+    echo "Invalid tag '$tag': only [A-Za-z0-9_./+-] allowed (no spaces, brackets, colons, quotes, commas, pipes)" >&2
+    return 1
+  fi
 }
 
-# Parse a YAML tags line into a newline-separated list of tag names
+# True if file starts with a YAML frontmatter block.
+has_frontmatter() {
+  local file="$1"
+  [ -s "$file" ] && [ "$(head -n1 "$file")" = "---" ]
+}
+
+# Print the body of the first YAML frontmatter block (between the first two
+# `---` lines). Closes N21: body `---...---` blocks are no longer scanned.
+first_frontmatter() {
+  awk '
+    /^---$/ {
+      c++
+      if (c == 1) next
+      if (c == 2) exit
+    }
+    c == 1 { print }
+  ' "$1"
+}
+
+# True if first frontmatter uses block-style YAML for tags
+# (`tags:` followed by indented `- foo` lines). Closes B3 detection.
+has_block_style_tags() {
+  first_frontmatter "$1" | awk '
+    /^tags:[[:space:]]*$/ { in_tags = 1; next }
+    in_tags && /^[[:space:]]+-[[:space:]]/ { found = 1; exit }
+    in_tags && /^[^[:space:]]/ { in_tags = 0 }
+    END { exit !found }
+  '
+}
+
+# Extract the tags: line from the first frontmatter only (N21).
+get_tags_line() {
+  first_frontmatter "$1" | sed -n '/^tags:/p' | head -n1
+}
+
+# Parse a YAML inline-array tags line into a newline-separated list.
 parse_tags() {
   local line="$1"
   echo "$line" | sed 's/^tags:[[:space:]]*//; s/^\[//; s/\]$//; s/,/ /g' \
     | tr ' ' '\n' | sed '/^$/d'
 }
 
-# Build a YAML tags array string from newline-separated tag list
+# Build a YAML tags array string from a newline-separated tag list.
 build_tags_yaml() {
   local tag_list="$1"
   if [ -z "$tag_list" ]; then
@@ -87,25 +159,90 @@ build_tags_yaml() {
   echo "tags: [${csv}]"
 }
 
+# Rewrite the tags line inside the first frontmatter block. If no tags line
+# exists in the first frontmatter, insert one immediately before the closing
+# `---`. Body content (including any later `---...---` blocks) is preserved
+# verbatim. Caller guarantees the file has frontmatter and inline-style tags.
+write_tags_line() {
+  local file="$1"
+  local new_line="$2"
+  local tmp
+  tmp="$(mktemp)"
+  awk -v new_line="$new_line" '
+    BEGIN { c = 0; replaced = 0; in_after = 0 }
+    {
+      if ($0 == "---") {
+        c++
+        if (c == 2 && !replaced) {
+          print new_line
+          replaced = 1
+        }
+        print
+        if (c >= 2) in_after = 1
+        next
+      }
+      if (in_after) { print; next }
+      if (c == 1 && /^tags:/ && !replaced) {
+        print new_line
+        replaced = 1
+        next
+      }
+      print
+    }
+  ' "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
+# Refuse if the file uses block-style YAML tags. Hard-fail per B3 in v0;
+# read-side block-style support is a v1 item.
+require_inline_tags() {
+  local file="$1"
+  if has_block_style_tags "$file"; then
+    {
+      echo "Refusing: $file uses block-style YAML tags (multi-line list)."
+      echo "Convert to inline form before using okm tag/untag, e.g.:"
+      echo "  tags: [foo, bar]"
+    } >&2
+    exit 1
+  fi
+}
+
 # Resolve a note argument to an absolute file path inside the vault.
+# N28: refuses paths that resolve outside the vault (same guard as N19 for open).
 resolve_note() {
   local arg="$1"
+  local resolved=""
   if [ -f "$arg" ]; then
-    echo "$arg"
+    resolved="$(realpath -- "$arg" 2>/dev/null || true)"
   elif [ -f "$VAULT/$arg" ]; then
-    echo "$VAULT/$arg"
+    resolved="$(realpath -- "$VAULT/$arg" 2>/dev/null || true)"
   else
     echo "Note not found: $arg" >&2
     return 1
   fi
+  local vault_real
+  vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
+  case "$resolved" in
+    "$vault_real"|"$vault_real"/*) ;;
+    *)
+      echo "Refusing: path resolves outside the vault ($resolved)" >&2
+      return 1 ;;
+  esac
+  echo "$resolved"
 }
 
-# List all tags across the vault with counts, or show tags for a specific note
+# Walk vault .md files honouring the private-folder default.
+list_vault_md_files() {
+  find "$VAULT" -type f -name '*.md' -not -path '*/.git/*' \
+    "${PRIVATE_FIND_PRUNE[@]}" -print 2>/dev/null
+}
+
+# List all tags across the vault with counts, or show tags for a specific note.
 list_tags() {
   local note="${1:-}"
   if [ -n "$note" ]; then
     local file
     file="$(resolve_note "$note")"
+    require_inline_tags "$file"
     local line
     line="$(get_tags_line "$file")"
     if [ -z "$line" ]; then
@@ -115,35 +252,56 @@ list_tags() {
     parse_tags "$line"
     return
   fi
-  need_cmd rg
-  rg -n --no-heading --glob '*.md' --glob '!.git/' "${PRIVATE_RG_GLOBS[@]}" '^tags:' "$VAULT" 2>/dev/null \
-    | sed 's/^.*tags:[[:space:]]*//; s/^\[//; s/\]$//; s/,/ /g' \
+  local files
+  files="$(list_vault_md_files)"
+  [ -n "$files" ] || return 0
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    get_tags_line "$f"
+  done <<< "$files" \
+    | sed 's/^tags:[[:space:]]*//; s/^\[//; s/\]$//; s/,/ /g' \
     | tr ' ' '\n' \
     | sed '/^$/d' \
     | sort | uniq -c | sort -rn \
     | awk '{printf "%-4d %s\n", $1, $2}'
 }
 
-# Add tags to a note
+# Add tags to a note. Validates each tag, refuses block-style files, and
+# prepends a frontmatter block if the file doesn't have one (N11).
 add_tags() {
   local note="${1:-}"
   [ -n "$note" ] || { echo "Note required" >&2; exit 1; }
   shift
   [ $# -gt 0 ] || { echo "At least one tag required" >&2; exit 1; }
 
+  for t in "$@"; do
+    validate_tag "$t" || exit 1
+  done
+
   local file
   file="$(resolve_note "$note")"
+  require_inline_tags "$file"
 
+  if ! has_frontmatter "$file"; then
+    local tmp
+    tmp="$(mktemp)"
+    {
+      printf -- '---\ntags: []\n---\n'
+      cat "$file"
+    } > "$tmp" && mv "$tmp" "$file"
+  fi
+
+  local existing=""
   local line
   line="$(get_tags_line "$file")"
-  local existing=""
   if [ -n "$line" ]; then
     existing="$(parse_tags "$line")"
   fi
 
   local merged="$existing"
   for t in "$@"; do
-    if ! echo "$merged" | grep -qxF "$t"; then
+    # `--` defends against tag values that start with `-` reaching grep as a flag (N22).
+    if ! printf '%s\n' "$merged" | grep -qxF -- "$t"; then
       merged="${merged:+${merged}
 }${t}"
     fi
@@ -151,24 +309,29 @@ add_tags() {
 
   local new_yaml
   new_yaml="$(build_tags_yaml "$merged")"
-
-  if [ -n "$line" ]; then
-    sed -i "/^---$/,/^---$/{s/^tags:.*$/${new_yaml}/;}" "$file"
-  else
-    sed -i "0,/^---$/!{0,/^---$/s/^---$/${new_yaml}\n---/}" "$file"
-  fi
+  write_tags_line "$file" "$new_yaml"
   echo "Tagged: $(basename "$file") -> ${new_yaml}"
 }
 
-# Remove tags from a note
+# Remove tags from a note.
 remove_tags() {
   local note="${1:-}"
   [ -n "$note" ] || { echo "Note required" >&2; exit 1; }
   shift
   [ $# -gt 0 ] || { echo "At least one tag required" >&2; exit 1; }
 
+  for t in "$@"; do
+    validate_tag "$t" || exit 1
+  done
+
   local file
   file="$(resolve_note "$note")"
+  require_inline_tags "$file"
+
+  if ! has_frontmatter "$file"; then
+    echo "No tags to remove (no frontmatter)"
+    return
+  fi
 
   local line
   line="$(get_tags_line "$file")"
@@ -182,6 +345,7 @@ remove_tags() {
 
   local remaining=""
   while IFS= read -r tag; do
+    [ -n "$tag" ] || continue
     local keep=true
     for t in "$@"; do
       if [ "$tag" = "$t" ]; then
@@ -197,20 +361,37 @@ remove_tags() {
 
   local new_yaml
   new_yaml="$(build_tags_yaml "$remaining")"
-  sed -i "/^---$/,/^---$/{s/^tags:.*$/${new_yaml}/;}" "$file"
+  write_tags_line "$file" "$new_yaml"
   echo "Updated: $(basename "$file") -> ${new_yaml}"
 }
 
-# List notes with a specific tag
+# List notes with a specific tag. Uses parsed-tag equality, not regex match,
+# so `okm tagged source` does NOT also match `source/spotify` (B2), and
+# `okm tagged '.*'` is just an invalid tag, not a regex (N17).
 list_tagged() {
   local tag="${1:-}"
   [ -n "$tag" ] || { echo "Tag required" >&2; exit 1; }
-  need_cmd rg
-  # rg exits 1 when no matches; treat as graceful empty result (not an error)
-  local matches
-  matches="$(rg -l --glob '*.md' --glob '!.git/' "${PRIVATE_RG_GLOBS[@]}" "^tags:.*\\b${tag}\\b" "$VAULT" 2>/dev/null || true)"
-  [ -z "$matches" ] && return 0
-  printf '%s\n' "$matches" | sed "s#^$VAULT/##" | sort
+  validate_tag "$tag" || exit 1
+
+  local files
+  files="$(list_vault_md_files)"
+  [ -n "$files" ] || return 0
+
+  local out=""
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    has_block_style_tags "$f" && continue  # quietly skip; v1 will support
+    local line
+    line="$(get_tags_line "$f")"
+    [ -n "$line" ] || continue
+    if parse_tags "$line" | grep -qxF -- "$tag"; then
+      out="${out:+${out}
+}${f#$VAULT/}"
+    fi
+  done <<< "$files"
+  if [ -n "$out" ]; then
+    printf '%s\n' "$out" | sort
+  fi
 }
 
 # Parse -t flag from arguments.
@@ -225,6 +406,14 @@ parse_tag_flag() {
       -t)
         shift
         [ $# -gt 0 ] || { echo "-t requires comma-separated tags" >&2; exit 1; }
+        # N27: validate every tag in the comma-separated list before accepting.
+        local IFS=','
+        for _tag in $1; do
+          _tag="$(printf '%s' "$_tag" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          [ -n "$_tag" ] || continue
+          validate_tag "$_tag" || exit 1
+        done
+        unset IFS
         TAG_FLAG_VALUES="$1"
         shift
         ;;
@@ -237,7 +426,8 @@ parse_tag_flag() {
 }
 
 list_notes() {
-  find "$VAULT" -type f -name '*.md' "${PRIVATE_FIND_PRUNE[@]}" | sed "s#^$VAULT/##"
+  find "$VAULT" -type f -name '*.md' -not -path '*/.git/*' \
+    "${PRIVATE_FIND_PRUNE[@]}" | sed "s#^$VAULT/##"
 }
 
 pick_file() {
@@ -254,11 +444,33 @@ open_note() {
     [ -n "${picked:-}" ] || exit 0
     exec "$EDITOR_CMD" "$VAULT/$picked"
   fi
+
+  local final
   if [ -e "$target" ]; then
-    exec "$EDITOR_CMD" "$target"
+    final="$target"
   else
-    exec "$EDITOR_CMD" "$VAULT/$target"
+    final="$VAULT/$target"
   fi
+
+  # N19: refuse paths that resolve outside the vault. realpath -m resolves
+  # even non-existent paths so `okm open new-note.md` still works.
+  local resolved vault_real
+  resolved="$(realpath -m -- "$final" 2>/dev/null || true)"
+  vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
+  if [ -z "$resolved" ] || [ -z "$vault_real" ]; then
+    echo "okm open: cannot resolve target or vault path" >&2
+    exit 1
+  fi
+  case "$resolved" in
+    "$vault_real"|"$vault_real"/*) ;;
+    *)
+      echo "okm open: refusing path that resolves outside the vault." >&2
+      echo "  vault:    $vault_real" >&2
+      echo "  resolved: $resolved" >&2
+      exit 1 ;;
+  esac
+
+  exec "$EDITOR_CMD" "$final"
 }
 
 new_note() {
@@ -273,16 +485,24 @@ new_note() {
   fi
 
   local slug file
-  slug="$(slugify "$title")"
+  slug="$(slugify "$title")" || exit 1
   file="$VAULT/$NOTES_DIR/$slug.md"
+  local safe_title
+  safe_title="$(yaml_escape_dq "$title")"
   [ -f "$file" ] || cat > "$file" <<EOF
 ---
-title: "${title}"
+title: "${safe_title}"
 created: $(iso_now)
 tags: ${tags_yaml}
 ---
 
 # ${title}
+
+## Context
+
+## Notes
+
+## Links
 
 EOF
   exec "$EDITOR_CMD" "$file"
@@ -329,11 +549,15 @@ tags: [daily]
 
 # $d
 
+## Captures
+
+## Notes
+
 ## Tasks
 
 - [ ]
 
-## Notes
+## Reflection
 
 EOF
   exec "$EDITOR_CMD" "$file"
@@ -376,6 +600,31 @@ sync_git() {
     echo "Vault is not a git repo" >&2
     exit 1
   }
+
+  # N15: refuse to sync if any symlink in the vault points outside the vault.
+  # Such symlinks are usually accidental (e.g. a user `ln -s`d a file in to
+  # read it in Obsidian) and would otherwise leak the target path on push.
+  local vault_real bad_links=""
+  vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
+  if [ -n "$vault_real" ]; then
+    while IFS= read -r link; do
+      [ -n "$link" ] || continue
+      local tgt
+      tgt="$(realpath -m -- "$link" 2>/dev/null || true)"
+      [ -n "$tgt" ] || continue
+      case "$tgt" in
+        "$vault_real"|"$vault_real"/*) ;;
+        *) bad_links+="  ${link} -> ${tgt}"$'\n' ;;
+      esac
+    done < <(find "$VAULT" -type l -not -path '*/.git/*' 2>/dev/null)
+  fi
+  if [ -n "$bad_links" ]; then
+    echo "okm sync: refusing — vault contains symlinks pointing outside the vault:" >&2
+    printf '%s' "$bad_links" >&2
+    echo "Remove or relocate these before syncing." >&2
+    exit 1
+  fi
+
   local msg="${*:-vault sync $(date '+%F %T')}"
   git -C "$VAULT" add -A
   if git -C "$VAULT" diff --cached --quiet; then
@@ -415,9 +664,13 @@ spot_note() {
     *track*)   spot_type="track" ;;
   esac
 
-  # Extract Spotify ID for embed URL
+  # N16: extract and validate the Spotify ID (must be 20+ alphanumeric chars).
   local spot_id embed_url
   spot_id="$(echo "$url" | sed -E 's#.*/[a-z]+/([a-zA-Z0-9]+)(\?.*)?$#\1#')"
+  if [ -z "$spot_id" ] || [[ ! "$spot_id" =~ ^[a-zA-Z0-9]{10,}$ ]]; then
+    echo "Invalid Spotify URL: could not extract a valid ID from '$url'" >&2
+    exit 1
+  fi
   embed_url="https://open.spotify.com/embed/${spot_type}/${spot_id}"
 
   # Try spotdl for metadata (tracks/albums/playlists)
@@ -438,8 +691,12 @@ spot_note() {
   fi
 
   local slug file
-  slug="$(slugify "$title")"
+  slug="$(slugify "$title")" || exit 1
   file="$VAULT/$NOTES_DIR/$slug.md"
+
+  local safe_title safe_artist
+  safe_title="$(yaml_escape_dq "$title")"
+  safe_artist="$(yaml_escape_dq "$artist")"
 
   local source_tag="source/spotify"
   case "$spot_type" in
@@ -458,10 +715,10 @@ spot_note() {
       episode|show)
         cat > "$file" <<EOF
 ---
-title: "${title}"
+title: "${safe_title}"
 source_type: spotify-${spot_type}
 source_url: "${url}"
-author: "${artist}"
+author: "${safe_artist}"
 created: $(iso_now)
 tags: [${tags_csv}]
 ---
@@ -480,6 +737,16 @@ tags: [${tags_csv}]
 
 -
 
+## Actionable Insights
+
+## Sources Cited
+
+## Follow-ups
+
+- [ ]
+
+## Structured Data
+
 ## Key Quotes
 
 > [MM:SS] "..."
@@ -493,10 +760,10 @@ EOF
       *)
         cat > "$file" <<EOF
 ---
-title: "${title}"
+title: "${safe_title}"
 source_type: spotify-${spot_type}
 source_url: "${url}"
-author: "${artist}"
+author: "${safe_artist}"
 created: $(iso_now)
 tags: [${tags_csv}]
 ---
@@ -513,6 +780,8 @@ tags: [${tags_csv}]
 
 -
 
+## Why I saved this
+
 EOF
         ;;
     esac
@@ -525,6 +794,158 @@ EOF
 
 open_obsidian() {
   flatpak run md.obsidian.Obsidian >/dev/null 2>&1 &
+}
+
+# === okm audit ===
+# Pre-share gate: scan tracked content for PARA notes, secret patterns, and
+# sensitive filenames. Tracked files only — `git ls-files` plus staged
+# additions. Untracked files are out of scope (they can't be pushed).
+audit_usage() {
+  cat <<'EOF'
+Usage: okm audit [--code-only|--vault-only] [--paths PATH...] [--quiet]
+
+Scan tracked content (vault by default) for:
+  - PARA content under daily/, inbox/, archive/, attachments/, private-*/
+    (skipping inbox/templates/ and demo-* files)
+  - Secret patterns: AWS keys, GitHub tokens, BEGIN ... PRIVATE KEY blocks
+  - Sensitive filenames: .env*, *.pem, *.key, *.crt, *credentials*, id_rsa*
+
+Flags:
+  --code-only    Scan the project repo (where bin/okm lives) and skip the
+                 PARA-content check. Useful before contributing harnesses
+                 upstream. Combine with --paths to narrow further.
+  --vault-only   Scan only the vault. Same as the default; listed for
+                 explicit semantics.
+  --paths P...   Restrict findings to files at or under the listed paths
+                 (relative to the scan root).
+  --quiet        Suppress per-finding output; just set the exit code.
+
+Exit codes:  0 clean  ·  1 findings  ·  2 usage error
+EOF
+}
+
+audit_run() {
+  local code_only=false vault_only=false quiet=false
+  local restrict_paths=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --code-only)  code_only=true;  shift ;;
+      --vault-only) vault_only=true; shift ;;
+      --quiet)      quiet=true;      shift ;;
+      --paths)
+        shift
+        while [ $# -gt 0 ] && [[ "$1" != --* ]]; do
+          restrict_paths+=("$1"); shift
+        done ;;
+      -h|--help) audit_usage; return 0 ;;
+      *) echo "okm audit: unknown flag '$1' (try --help)" >&2; exit 2 ;;
+    esac
+  done
+
+  if $code_only && $vault_only; then
+    echo "okm audit: --code-only and --vault-only are mutually exclusive" >&2
+    exit 2
+  fi
+
+  local root
+  if $code_only; then
+    root="$OKM_SCRIPT_DIR"
+  else
+    root="$VAULT"
+  fi
+
+  if [ ! -d "${root}/.git" ]; then
+    echo "okm audit: ${root} is not a git repository — nothing to scan" >&2
+    exit 2
+  fi
+
+  local files
+  files="$(
+    {
+      git -C "$root" ls-files 2>/dev/null
+      git -C "$root" diff --cached --name-only --diff-filter=A 2>/dev/null
+    } | sort -u
+  )"
+
+  if [ ${#restrict_paths[@]} -gt 0 ] && [ -n "$files" ]; then
+    local filtered=""
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      for p in "${restrict_paths[@]}"; do
+        case "$f" in
+          "$p"|"$p"/*) filtered+="${f}"$'\n'; break ;;
+        esac
+      done
+    done <<< "$files"
+    files="$filtered"
+  fi
+
+  local findings=0 out=""
+  if [ -n "$files" ]; then
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      local full="$root/$f" base
+      base="$(basename "$f")"
+      [ -e "$full" ] || continue
+
+      # 1. PARA content (skipped under --code-only).
+      if ! $code_only; then
+        local skip=false
+        case "$f" in inbox/templates/*) skip=true ;; esac
+        case "$base" in demo-*) skip=true ;; esac
+        if ! $skip; then
+          case "$f" in
+            daily/*.md|inbox/*.md|archive/*.md)
+              out+="${f}:1: para-content user note in public PARA folder"$'\n'
+              findings=$((findings+1)) ;;
+            attachments/*)
+              out+="${f}:1: para-content attachment"$'\n'
+              findings=$((findings+1)) ;;
+            private-*/*)
+              out+="${f}:1: para-content file in private-*/"$'\n'
+              findings=$((findings+1)) ;;
+          esac
+        fi
+      fi
+
+      # 2. Sensitive filenames.
+      case "$base" in
+        .env|.env.*|*.pem|*.key|*.crt|*credentials*|id_rsa|id_rsa.*|id_ed25519|id_ed25519.*)
+          out+="${f}:1: sensitive-filename matches forbidden pattern"$'\n'
+          findings=$((findings+1)) ;;
+      esac
+
+      # 3. Secret patterns (text-file content scan; -I skips binary).
+      if [ -f "$full" ]; then
+        local matches
+        matches="$(grep -InE \
+          '(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' \
+          "$full" 2>/dev/null || true)"
+        if [ -n "$matches" ]; then
+          while IFS= read -r m; do
+            [ -n "$m" ] || continue
+            out+="${f}:${m%%:*}: secret-pattern match"$'\n'
+            findings=$((findings+1))
+          done <<< "$matches"
+        fi
+      fi
+    done <<< "$files"
+  fi
+
+  if [ "$findings" -eq 0 ]; then
+    if ! $quiet; then
+      local count
+      count="$(printf '%s' "$files" | grep -c . || true)"
+      echo "okm audit: clean (${root}, ${count} tracked files scanned)"
+    fi
+    return 0
+  fi
+
+  if ! $quiet; then
+    echo "okm audit: ${findings} finding(s) in ${root}:" >&2
+    printf '%s' "$out" | sort -u
+  fi
+  return 1
 }
 
 case "${1:-help}" in
@@ -541,6 +962,7 @@ case "${1:-help}" in
   tag) shift; add_tags "$@" ;;
   untag) shift; remove_tags "$@" ;;
   tagged) shift; list_tagged "${1:-}" ;;
+  audit) shift; audit_run "$@" ;;
   obs) shift; open_obsidian ;;
   path) printf '%s\n' "$VAULT" ;;
   help|-h|--help) usage ;;

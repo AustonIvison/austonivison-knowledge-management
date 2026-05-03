@@ -114,6 +114,25 @@ ensure_gitignore() {
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
 
+# Secrets — never commit these regardless of KM_TRACK_NOTES (B5)
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*credentials*
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+# Private notes — local-only by default (N3). Opt in by removing these lines
+# (e.g. when you've initialised git-crypt and want history under encryption).
+private-daily/*.md
+private-inbox/*.md
+private-archive/*.md
+private-attachments/*
+
 # Large or binary attachments (track explicitly if needed)
 attachments/*.pdf
 attachments/*.zip
@@ -163,6 +182,10 @@ ensure_git_repo() {
         git -C "${dir}" commit -m "initial vault"
         log_info "OK: git repo initialised with initial commit"
     fi
+    # N15: store symlinks as their target-path text rather than following
+    # them. `okm sync` also refuses on symlinks pointing outside the vault;
+    # this is belt-and-braces.
+    git -C "${dir}" config core.symlinks false
 }
 
 ensure_git_remote() {
@@ -614,8 +637,12 @@ install_lazygit
 log_info "==> Linking Neovim config"
 ensure_nvim_config_link
 
-log_info "==> Installing Nerd Font (terminal icons)"
-install_nerd_font
+if [ "${KM_INSTALL_FONT:-1}" = "1" ]; then
+    log_info "==> Installing Nerd Font (terminal icons)"
+    install_nerd_font
+else
+    log_info "SKIP: Nerd Font install (KM_INSTALL_FONT=0)"
+fi
 
 log_info "==> Verifying lazygit config"
 verify_lazygit_config

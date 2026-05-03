@@ -101,9 +101,11 @@ setup() {
     local file="${FAKE_VAULT_DIR}/daily/${today}.md"
     [ -f "$file" ]
     grep -q "date: ${today}" "$file"
+    grep -q "## Captures" "$file"
+    grep -q "## Notes" "$file"
     grep -q "## Tasks" "$file"
     grep -q "\- \[ \]" "$file"
-    grep -q "## Notes" "$file"
+    grep -q "## Reflection" "$file"
 }
 
 @test "okm today is idempotent (does not overwrite)" {
@@ -352,4 +354,94 @@ private secret payload"
     KM_INCLUDE_PRIVATE=1 run "${OKM}" tags
     assert_success
     assert_output --partial "therapy"
+}
+
+# === N13: YAML double-quote escaping ===
+
+@test "N13: okm new escapes double-quotes in YAML title" {
+    run "${OKM}" new 'Lessons from "The Manager"'
+    assert_success
+    local file="${FAKE_VAULT_DIR}/inbox/lessons-from-the-manager.md"
+    [ -f "$file" ]
+    grep -q 'title: "Lessons from \\"The Manager\\""' "$file"
+}
+
+# === N14 + N18 + N20: slugify hardening ===
+
+@test "N14: okm new with all-emoji title fails with clear error" {
+    run "${OKM}" new "☕"
+    assert_failure
+    assert_output --partial "empty or too-short slug"
+}
+
+@test "N18: okm new with very long title truncates slug (no OS error)" {
+    local long_title
+    long_title="$(python3 -c 'print("a" * 300)')"
+    run "${OKM}" new "$long_title"
+    assert_success
+    local file
+    file="$(find "${FAKE_VAULT_DIR}/inbox" -name '*.md' -newer "${FAKE_VAULT_DIR}" | head -1)"
+    [ -n "$file" ]
+    local bname
+    bname="$(basename "$file")"
+    [ "${#bname}" -le 204 ]
+}
+
+@test "N20: okm new with newline in title collapses to single-line slug" {
+    run "${OKM}" new $'multi\nline\ntitle'
+    assert_success
+    local file="${FAKE_VAULT_DIR}/inbox/multi-line-title.md"
+    [ -f "$file" ]
+}
+
+# === N16: Spotify ID validation ===
+
+@test "N16: okm spot with truncated track URL (no ID) is rejected" {
+    run "${OKM}" spot "https://open.spotify.com/track/"
+    assert_failure
+    assert_output --partial "Invalid Spotify URL"
+}
+
+@test "N16: okm spot with bare domain URL is rejected" {
+    run "${OKM}" spot "https://open.spotify.com/"
+    assert_failure
+    assert_output --partial "Invalid Spotify URL"
+}
+
+# === N26: backslash escaping in YAML ===
+
+@test "N26: okm new escapes backslashes in YAML title" {
+    run "${OKM}" new 'test\note'
+    assert_success
+    local file="${FAKE_VAULT_DIR}/inbox/test-note.md"
+    [ -f "$file" ]
+    grep -q 'title: "test\\\\note"' "$file"
+}
+
+# === N27: -t flag validation ===
+
+@test "N27: okm new -t rejects YAML-breaking tag values" {
+    run "${OKM}" new "Test" -t 'evil], injected: true'
+    assert_failure
+    assert_output --partial "Invalid tag"
+}
+
+@test "N27: okm new -t accepts valid comma-separated tags" {
+    run "${OKM}" new "Tag Test" -t 'foo,bar,source/music'
+    assert_success
+    local file="${FAKE_VAULT_DIR}/inbox/tag-test.md"
+    [ -f "$file" ]
+    grep -q 'tags: \[foo, bar, source/music\]' "$file"
+}
+
+@test "N27: okm capture -t rejects invalid tags" {
+    run "${OKM}" capture "body" -t 'ok,bad tag'
+    assert_failure
+    assert_output --partial "Invalid tag"
+}
+
+@test "N27: okm spot -t rejects invalid tags" {
+    run "${OKM}" spot "https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6" -t 'evil]'
+    assert_failure
+    assert_output --partial "Invalid tag"
 }

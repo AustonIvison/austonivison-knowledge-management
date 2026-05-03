@@ -69,6 +69,30 @@ setup() {
     ! grep -q "archive/*.md" "${target}/.gitignore"
 }
 
+@test "B5: ensure_gitignore excludes secret patterns regardless of KM_TRACK_NOTES" {
+    local target="${TEST_TEMP_DIR}/vault-secrets"
+    mkdir -p "$target"
+    KM_TRACK_NOTES=true ensure_gitignore "$target"
+    grep -q '^\.env$' "${target}/.gitignore"
+    grep -q '^\.env\.\*$' "${target}/.gitignore"
+    grep -q '^\*\.pem$' "${target}/.gitignore"
+    grep -q '^\*\.key$' "${target}/.gitignore"
+    grep -q '^\*\.crt$' "${target}/.gitignore"
+    grep -q '^\*credentials\*$' "${target}/.gitignore"
+    grep -q '^id_rsa$' "${target}/.gitignore"
+    grep -q '^id_ed25519$' "${target}/.gitignore"
+}
+
+@test "N3: ensure_gitignore excludes private-*/ folders regardless of KM_TRACK_NOTES" {
+    local target="${TEST_TEMP_DIR}/vault-private"
+    mkdir -p "$target"
+    KM_TRACK_NOTES=true ensure_gitignore "$target"
+    grep -q '^private-daily/\*\.md$' "${target}/.gitignore"
+    grep -q '^private-inbox/\*\.md$' "${target}/.gitignore"
+    grep -q '^private-archive/\*\.md$' "${target}/.gitignore"
+    grep -q '^private-attachments/\*$' "${target}/.gitignore"
+}
+
 @test "ensure_gitignore is idempotent" {
     local target="${TEST_TEMP_DIR}/vault-test"
     mkdir -p "$target"

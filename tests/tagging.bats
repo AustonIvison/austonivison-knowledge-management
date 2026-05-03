@@ -195,3 +195,201 @@ tags: [other]
     [ -f "$file" ]
     grep -q "source/music, favorite" "$file"
 }
+
+# === Tagging-cluster regressions (B2, B3, B4, N10, N11, N17, N21, N22, N23) ===
+
+# B2: okm tagged uses parsed-tag equality, not boundary regex.
+@test "B2: okm tagged 'source' does not match notes tagged 'source/spotify'" {
+    create_vault_file "inbox/exact.md" "---
+tags: [source]
+---"
+    create_vault_file "inbox/hier.md" "---
+tags: [source/spotify]
+---"
+    run "${OKM}" tagged "source"
+    assert_success
+    assert_output --partial "exact.md"
+    refute_output --partial "hier.md"
+}
+
+@test "B2: okm tagged 'para' does not match 'para-tag' or 'parameters'" {
+    create_vault_file "inbox/a.md" "---
+tags: [para-tag]
+---"
+    create_vault_file "inbox/b.md" "---
+tags: [parameters]
+---"
+    create_vault_file "inbox/c.md" "---
+tags: [para]
+---"
+    run "${OKM}" tagged "para"
+    assert_success
+    assert_output --partial "c.md"
+    refute_output --partial "a.md"
+    refute_output --partial "b.md"
+}
+
+# N17: regex metacharacters in `okm tagged` are rejected, not interpreted.
+@test "N17: okm tagged '.*' is rejected as invalid (no regex injection)" {
+    create_vault_file "inbox/note.md" "---
+tags: [foo]
+---"
+    run "${OKM}" tagged ".*"
+    assert_failure
+    assert_output --partial "Invalid tag"
+}
+
+@test "N17: okm tagged 'foo|bar' is rejected as invalid" {
+    create_vault_file "inbox/note.md" "---
+tags: [foo, bar]
+---"
+    run "${OKM}" tagged "foo|bar"
+    assert_failure
+    assert_output --partial "Invalid tag"
+}
+
+# N10: hierarchical tags don't break the sed delimiter.
+@test "N10: okm tag accepts hierarchical tag 'source/podcast' without sed errors" {
+    create_vault_file "inbox/note.md" "---
+tags: []
+---"
+    run "${OKM}" tag "inbox/note.md" "source/podcast"
+    assert_success
+    refute_output --partial "sed:"
+    grep -q "tags: \[source/podcast\]" "${FAKE_VAULT_DIR}/inbox/note.md"
+}
+
+@test "N10: okm tag round-trips hierarchical tag through tagged" {
+    create_vault_file "inbox/note.md" "---
+tags: []
+---"
+    "${OKM}" tag "inbox/note.md" "source/podcast" >/dev/null
+    run "${OKM}" tagged "source/podcast"
+    assert_success
+    assert_output --partial "note.md"
+}
+
+# N11: no-frontmatter file gets one prepended and the tag added.
+@test "N11: okm tag on a file without frontmatter prepends one and adds the tag" {
+    create_vault_file "inbox/plain.md" "Just plain text"
+    run "${OKM}" tag "inbox/plain.md" "newtag"
+    assert_success
+    grep -q "^---$" "${FAKE_VAULT_DIR}/inbox/plain.md"
+    grep -q "tags: \[newtag\]" "${FAKE_VAULT_DIR}/inbox/plain.md"
+    grep -q "^Just plain text$" "${FAKE_VAULT_DIR}/inbox/plain.md"
+}
+
+@test "N11: okm untag on a file without frontmatter is a no-op (not a fake success)" {
+    create_vault_file "inbox/plain.md" "Just plain text"
+    run "${OKM}" untag "inbox/plain.md" "anything"
+    assert_success
+    assert_output --partial "No tags to remove"
+    [ "$(cat "${FAKE_VAULT_DIR}/inbox/plain.md")" = "Just plain text" ]
+}
+
+# B3: block-style YAML tags are refused, not silently corrupted.
+@test "B3: okm tag refuses block-style YAML tags with a clear error" {
+    create_vault_file "inbox/block.md" "---
+tags:
+  - foo
+  - bar
+---"
+    run "${OKM}" tag "inbox/block.md" "newtag"
+    assert_failure
+    assert_output --partial "block-style"
+}
+
+@test "B3: okm untag refuses block-style YAML tags with a clear error" {
+    create_vault_file "inbox/block.md" "---
+tags:
+  - foo
+---"
+    run "${OKM}" untag "inbox/block.md" "foo"
+    assert_failure
+    assert_output --partial "block-style"
+}
+
+# B4 + N23: invalid characters rejected at validation time.
+@test "B4: okm tag rejects tag containing space" {
+    create_vault_file "inbox/note.md" "---
+tags: []
+---"
+    run "${OKM}" tag "inbox/note.md" "machine learning"
+    assert_failure
+    assert_output --partial "Invalid tag"
+}
+
+@test "B4/N23: okm tag rejects tag containing ]" {
+    create_vault_file "inbox/note.md" "---
+tags: []
+---"
+    run "${OKM}" tag "inbox/note.md" "evil]"
+    assert_failure
+    assert_output --partial "Invalid tag"
+}
+
+@test "B4: okm tag rejects tag containing :" {
+    create_vault_file "inbox/note.md" "---
+tags: []
+---"
+    run "${OKM}" tag "inbox/note.md" "foo:bar"
+    assert_failure
+    assert_output --partial "Invalid tag"
+}
+
+@test "B4: okm tag rejects tag containing comma" {
+    create_vault_file "inbox/note.md" "---
+tags: []
+---"
+    run "${OKM}" tag "inbox/note.md" "foo,bar"
+    assert_failure
+    assert_output --partial "Invalid tag"
+}
+
+# N21: body `---...---` blocks are not parsed as frontmatter.
+@test "N21: okm tags <note> reads only the first frontmatter block" {
+    create_vault_file "inbox/note.md" "---
+tags: [real]
+---
+Body content.
+
+---
+tags: [body-fake]
+---"
+    run "${OKM}" tags "inbox/note.md"
+    assert_success
+    assert_output --partial "real"
+    refute_output --partial "body-fake"
+}
+
+@test "N21: okm tag preserves body --- blocks verbatim" {
+    create_vault_file "inbox/note.md" "---
+tags: [original]
+---
+# Body
+
+Quoting someone else's frontmatter:
+
+---
+tags: [example-in-body]
+---
+
+End."
+    run "${OKM}" tag "inbox/note.md" "added"
+    assert_success
+    # Frontmatter tags updated:
+    grep -q "^tags: \[original, added\]$" "${FAKE_VAULT_DIR}/inbox/note.md"
+    # Body example preserved (still appears in the file):
+    grep -q "^tags: \[example-in-body\]$" "${FAKE_VAULT_DIR}/inbox/note.md"
+}
+
+# N22: tags starting with `-` work safely thanks to `grep --`.
+@test "N22: okm tag accepts tag starting with - without grep flag-injection error" {
+    create_vault_file "inbox/note.md" "---
+tags: [foo]
+---"
+    run "${OKM}" tag "inbox/note.md" "-leading-dash-tag"
+    assert_success
+    refute_output --partial "grep:"
+    grep -q -- "tags: \[foo, -leading-dash-tag\]" "${FAKE_VAULT_DIR}/inbox/note.md"
+}
