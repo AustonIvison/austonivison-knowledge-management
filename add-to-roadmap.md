@@ -1,3 +1,253 @@
+
+A# PVS Addendum v3: What Thymer's Article Actually Implies
+*A close reading of https://thymer.com/ejectable — focusing on the
+implications, not just the four named properties*
+
+---
+
+## What the Article Says vs. What It Implies
+
+The article names four properties but contains several additional
+structural claims embedded in its framing. Those implied claims are
+actually the most useful for the PVS spec, because the four named
+properties were already addressed in Addendum v1/v2. What's left is
+what the article *assumes* without stating.
+
+---
+
+## Implied Property 1: Export Must Be Usable in Practice, Not Just Complete
+
+> *"goes beyond the basic export some apps offer, which typically provides
+> a partial data dump that's unusable in practice"*
+
+The word **unusable** is doing a lot of work here. The article is not
+just saying the export must be *complete* — it's saying completeness alone
+is not sufficient. A complete dump can still be unusable.
+
+**What makes a complete export unusable?**
+- Files are present but links are broken (path references changed)
+- Data is present but requires the original app to interpret it
+- All notes exist but have no navigable entry point
+- File names are GUIDs or hashes, not human-readable titles
+- Attachments are present but de-associated from the notes that reference them
+
+**Gap in the current spec:** The PVS spec constrains *what goes into* notes
+but never defines a **link integrity guarantee** — the property that every
+link in every note resolves to a real file in the bundle, verifiably, before
+the bundle is handed off.
+
+**New rule — U1: Link Integrity Guarantee**
+
+The vault bundle MUST pass a link integrity check before it is considered
+complete. This is a distinct check from the smoke test (§C5) — it is
+*content-level* correctness, not *format-level* correctness.
+
+```bash
+# scripts/link-integrity.sh
+# Verifies every markdown link in every .md file resolves to a real file
+
+import re, os, sys
+from pathlib import Path
+
+vault = Path("vault/")
+broken = []
+
+for md_file in vault.rglob("*.md"):
+    content = md_file.read_text()
+    links = re.findall(r'$$.*?$$$$(.*?)$$', content)
+    for link in links:
+        # Strip anchors and query strings
+        target = link.split('#').split('?')
+        if target.startswith('http') or target == '':
+            continue
+        resolved = (md_file.parent / target).resolve()
+        if not resolved.exists():
+            broken.append(f"{md_file}: broken link → {link}")
+
+if broken:
+    for b in broken: print(b)
+    sys.exit(1)
+print(f"All links valid.")
+```
+
+This script MUST be run as part of every vault bundle creation (§C1).
+A bundle with broken links fails the "usable in practice" standard even
+if it is informationally complete.
+
+---
+
+## Implied Property 2: Alternative App Compatibility Is a Design Constraint, Not a Bonus
+
+> *"Ideally the output is well-documented so alternative apps can also
+> work on the same data."*
+
+The word **ideally** makes this sound optional. But in the context of
+the article's argument — that enshittification, bait-and-switch pricing,
+and arbitrary account suspension are real risks — alternative app
+compatibility is actually a *survivability* property. If the original
+app disappears and no alternative can open your data, the export was
+not useful.
+
+**Gap in the current spec:** The PVS spec targets vim/neovim as the
+portability target. But the spec never defines a **minimum viable reader
+interface** — the smallest set of capabilities any app needs to claim
+it can "work on" PVS-compliant vault data.
+
+**New rule — U2: Minimum Viable Reader (MVR) Definition**
+
+A PVS-compliant vault must be openable by any app that satisfies the
+MVR contract:
+
+| Capability | Requirement |
+|---|---|
+| Render CommonMark | MUST |
+| Parse YAML 1.1 frontmatter | MUST |
+| Follow relative `[text](path.md)` links | MUST |
+| List files in a directory | MUST |
+| Full-text search across files | SHOULD |
+| Resolve backlinks (parse all files for references to current file) | SHOULD |
+| Render fenced code blocks as text | MUST |
+| Render standard markdown tables | MUST |
+
+Any app that satisfies the MUST requirements can work on PVS vault data.
+This is the bar to clear — not "works in Obsidian" or "works in neovim"
+specifically, but "works in anything that passes the MVR."
+
+The MVR definition also constrains the spec retroactively: any rule in
+§1–9 that would prevent a MVR-compliant app from opening a note is a
+spec violation. For example, using Obsidian-specific `[[wikilinks]]`
+violates MVR because most MVR-compliant apps do not resolve them.
+
+---
+
+## Implied Property 3: Longevity Is the Actual Goal, Not Just Portability
+
+> *"They ensure that what we create with our modern tools today remains
+> accessible and functional far into the future."*
+
+> *"just as future-proof as DOOM.EXE or NOTEPAD.EXE"*
+> *(from the companion article https://thymer.com/local-first-ejectable)*
+
+The article frames ejectability not as a migration convenience but as a
+**preservation guarantee**. The threat model is not just "I want to switch
+apps" — it is "the app might cease to exist, and my data must survive that."
+
+**Gap in the current spec:** Addendum v1 introduced a longevity tier table
+(E5), but it was framed as a format stability decision. It was not framed
+as what the article actually intends: a **threat-model-driven constraint**.
+
+The threat model has three distinct failure scenarios, each requiring a
+different spec response:
+
+| Threat | Scenario | Required mitigation |
+|---|---|---|
+| **App death** | Obsidian shuts down; no new versions | MVR (§U2): any compliant app opens the vault |
+| **Plugin death** | Dataview, Tasks, or Excalidraw plugin abandoned | Static fallbacks (§3.1, §4, §5): snapshots carry meaning without the plugin |
+| **Format death** | `.canvas` or `.base` schema changes incompatibly | Companion `.md` (§4, §6): the Tier-1 file carries the information |
+
+**New rule — U3: Threat Model Documentation**
+
+`VAULT_SCHEMA.md` MUST contain a threat model section listing every
+Obsidian-specific dependency and its mitigation:
+
+```markdown
+## Threat Model
+
+| Dependency | Failure scenario | Mitigation | Status |
+|---|---|---|---|
+| Obsidian app | App shuts down | All notes pass MVR (§U2); neovim/ distribution present | ✅ |
+| Dataview plugin | Plugin abandoned | Static snapshot updated weekly; MOC covers same notes | ✅ |
+| Excalidraw plugin | Plugin abandoned | SVG auto-export present alongside every .excalidraw.md | ✅ |
+| Canvas format | Schema change | Companion .md exists for every .canvas | ✅ |
+| Obsidian Sync | Service ends | git is canonical; sync is secondary | ✅ |
+| Templater plugin | Plugin abandoned | plain/ equivalents in Templates/plain/ | ✅ |
+```
+
+Any dependency with no listed mitigation is a **portability debt** that
+MUST be resolved before the vault is considered ejectable.
+
+---
+
+## Implied Property 4: The Ejection Process Must Not Require Expert Knowledge
+
+> *"The ejection process should be straightforward. Just click a button
+> or two, download some files; it should not be a 100-step process."*
+
+Thymer is describing a SaaS app where the vendor builds the export button.
+For Obsidian, there is no vendor export button — the *vault author* is
+responsible for building the equivalent.
+
+**Gap in the current spec:** The `neovim/README.md` (§C2) says "≤5 step
+install instructions" but that only covers the neovim toolchain setup. There
+is no defined **ejection runbook** — the procedure a person (including future-
+you with no memory of these decisions) follows to extract a complete, usable
+bundle from the vault.
+
+**New rule — U4: Ejection Runbook**
+
+The vault MUST contain a `EJECT.md` file at the vault root. It MUST be
+executable by someone with no prior knowledge of the vault's configuration.
+Required sections:
+
+```markdown
+# EJECT.md — Vault Ejection Runbook
+
+## What this file is
+This vault is designed to be ejectable. If you need to stop using Obsidian
+and open this vault elsewhere, follow these steps.
+
+## Option A: Open in neovim (full experience)
+1. Install neovim ≥ 0.9
+2. Run: `cd neovim/ && ./install.sh`
+3. Open neovim from the vault root: `nvim .`
+4. All plugins, keymaps, and templates are pre-configured.
+
+## Option B: Open in any markdown editor (basic experience)
+1. Open the vault folder in any editor (VS Code, Typora, Zed, etc.)
+2. All notes are standard CommonMark + YAML frontmatter
+3. All links are relative paths — they will resolve correctly
+4. Start from: VAULT_INDEX.md
+
+## Option C: Read-only access (emergency)
+1. Every note is a plain .md file readable with any text editor
+2. VAULT_INDEX.md is the entry point
+3. Static snapshots of all live queries are embedded in each MOC note
+
+## Verifying the bundle is complete
+Run: `scripts/smoke-test.sh && scripts/link-integrity.sh`
+Both must exit 0.
+
+## What you will lose
+Features that require Obsidian or the neovim stack and have no full equivalent:
+- Live Dataview/Tasks query rendering (static snapshots available)
+- Visual graph view (MOC hierarchy + VAULT_INDEX.md available)
+[list any other degraded continuity items from VAULT_MANIFEST.json]
+```
+
+The final section — "What you will lose" — is critical. It is the honest
+disclosure that Thymer's article implies with its "unusable in practice"
+warning. A runbook that overpromises is worse than no runbook.
+
+---
+
+## The Property the Article Does Not Name But Should: Observability
+
+There is one property implied by the entire framing of the Thymer article
+that none of its four named properties capture explicitly:
+
+> How do you know, *right now*, whether your vault is ejectable?
+
+Thymer's framing assumes the app vendor ensures ejectability. For a
+self-managed vault, the user is the vendor. That means the vault needs
+**observability** — a way to continuously measure its own ejectability
+health, not just at export time.
+
+**New rule — U5: Ejectability Health Score**
+
+The vault MUST include a `scripts/ejectability-check.py` that produces a
+structured report:
+
+A
 # Portable Vault Specification and Ejectability Addendum
 
 This document defines a portable-first specification for an Obsidian vault and extends it with ejectability properties inspired by Thymer's concept of ejectable apps.[1][2] The goal is to guarantee that a vault remains readable, navigable, and operational outside Obsidian, with vim and neovim as the minimum target environments.[3][1]
