@@ -210,7 +210,9 @@ TODO → PARA: `TODO/FIXME/HACK/XXX` = Projects, `- [ ]` = Areas, `REVIEW:` = Re
 
 ```bash
 # Replace $KM with project path
-3 7,12,15 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
+3 7 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
+3 12 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
+3 15 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
 0 7,12,15 * * * /usr/bin/bash $KM/scripts/weekly-tasks.sh --output
 0 17 * * *      $KM/venv/bin/python $KM/scripts/compress-images.py
 ```

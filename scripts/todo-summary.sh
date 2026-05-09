@@ -156,12 +156,13 @@ if [[ "$WRITE_FILE" == true ]]; then
             header="$(head -n $((today_line - 1)) "$OUTPUT_FILE")"
             footer="$(tail -n +$((today_end + 1)) "$OUTPUT_FILE")"
 
-            # Replace today's section with fresh scan
+            # Replace today's section with fresh scan (atomic write)
+            _tmp_out="$(mktemp -- "${OUTPUT_FILE}.XXXXXX")"
             {
                 [[ -n "$header" ]] && printf '%s\n' "$header"
                 printf '%s\n' "$rendered_day"
                 [[ -n "$footer" ]] && printf '%s\n' "$footer"
-            } > "$OUTPUT_FILE"
+            } > "$_tmp_out" && mv "$_tmp_out" "$OUTPUT_FILE"
         else
             # New day: carry forward unchecked items from the most recent day section
             prev_day_line=$(grep -n '^### [0-9]' "$OUTPUT_FILE" | head -1 | cut -d: -f1)
@@ -184,14 +185,16 @@ if [[ "$WRITE_FILE" == true ]]; then
             if [[ -n "$prev_day_line" ]]; then
                 header="$(head -n $((prev_day_line - 1)) "$OUTPUT_FILE")"
                 body="$(tail -n +${prev_day_line} "$OUTPUT_FILE")"
-                printf '%s\n%s\n%s\n' "$header" "$rendered_day" "$body" > "$OUTPUT_FILE"
+                _tmp_out="$(mktemp -- "${OUTPUT_FILE}.XXXXXX")"
+                printf '%s\n%s\n%s\n' "$header" "$rendered_day" "$body" > "$_tmp_out" && mv "$_tmp_out" "$OUTPUT_FILE"
             else
                 # No day sections yet — insert before Archive
                 if grep -qn "^## Archive" "$OUTPUT_FILE"; then
                     archive_line=$(grep -n "^## Archive" "$OUTPUT_FILE" | head -1 | cut -d: -f1)
                     header="$(head -n $((archive_line - 1)) "$OUTPUT_FILE")"
                     footer="$(tail -n +${archive_line} "$OUTPUT_FILE")"
-                    printf '%s\n%s\n%s\n' "$header" "$rendered_day" "$footer" > "$OUTPUT_FILE"
+                    _tmp_out="$(mktemp -- "${OUTPUT_FILE}.XXXXXX")"
+                    printf '%s\n%s\n%s\n' "$header" "$rendered_day" "$footer" > "$_tmp_out" && mv "$_tmp_out" "$OUTPUT_FILE"
                 else
                     # Append before archive (shouldn't happen with proper frontmatter)
                     printf '%s\n' "$rendered_day" >> "$OUTPUT_FILE"
@@ -199,12 +202,13 @@ if [[ "$WRITE_FILE" == true ]]; then
             fi
         fi
     else
-        # New file: frontmatter + first day section + archive
+        # New file: frontmatter + first day section + archive (atomic write)
+        _tmp_out="$(mktemp -- "${OUTPUT_FILE}.XXXXXX")"
         {
             printf '%b' "$frontmatter"
             printf '%s\n\n' "$rendered_day"
             printf '%s\n' "$archive_section"
-        } > "$OUTPUT_FILE"
+        } > "$_tmp_out" && mv "$_tmp_out" "$OUTPUT_FILE"
     fi
     echo "Summary written to: ${OUTPUT_FILE}"
 else

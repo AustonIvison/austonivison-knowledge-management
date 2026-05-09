@@ -112,9 +112,11 @@ fi
 
 # Version check: must be >= 0.10 for LazyVim compatibility
 if [ -x "${BIN_DIR}/nvim" ]; then
-    nvim_version="$("${BIN_DIR}/nvim" --version 2>/dev/null | head -1 | sed 's/NVIM v//')"
-    nvim_major="$(echo "${nvim_version}" | cut -d. -f1)"
-    nvim_minor="$(echo "${nvim_version}" | cut -d. -f2)"
+    nvim_version="$("${BIN_DIR}/nvim" --version 2>/dev/null | head -1 | sed 's/NVIM v//' || echo "0.0")"
+    nvim_major="${nvim_version%%.*}"
+    nvim_minor="${nvim_version#*.}"; nvim_minor="${nvim_minor%%.*}"
+    [[ "${nvim_major}" =~ ^[0-9]+$ ]] || nvim_major=0
+    [[ "${nvim_minor}" =~ ^[0-9]+$ ]] || nvim_minor=0
     if [ "${nvim_major}" -gt 0 ] || [ "${nvim_minor}" -ge 10 ]; then
         _pass "nvim version ${nvim_version} (>= 0.10 required for LazyVim)"
     else

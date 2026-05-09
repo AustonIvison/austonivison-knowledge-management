@@ -261,6 +261,21 @@ tags: [safe]
     assert_success
 }
 
+# === yaml_escape_dq: newline injection ===
+
+@test "fuzz: title with embedded newline does not break YAML frontmatter" {
+    run "${OKM}" new $'Title With\nNewline'
+    assert_success
+    local file
+    file="$(find "${FAKE_VAULT_DIR}/inbox" -name '*.md' | head -1)"
+    [ -f "$file" ]
+    run grep '^title:' "$file"
+    assert_output --regexp '^title: "Title With Newline"'
+    # Frontmatter must close properly (at least two --- lines)
+    run grep -c '^---$' "$file"
+    [ "${output}" -ge 2 ]
+}
+
 # === Cross-cutting: no file escapes vault ===
 
 @test "fuzz: no subcommand creates files outside OBSIDIAN_VAULT" {

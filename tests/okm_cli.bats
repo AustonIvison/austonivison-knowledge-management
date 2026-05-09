@@ -445,3 +445,30 @@ private secret payload"
     assert_failure
     assert_output --partial "Invalid tag"
 }
+
+# === recent_notes: smoke test ===
+
+@test "okm recent exits cleanly with empty vault (no fzf interaction)" {
+    # Stub fzf to immediately return empty (simulates no selection / Esc)
+    mkdir -p "${FAKE_VAULT_DIR}/inbox" "${FAKE_VAULT_DIR}/daily"
+    export PATH="${BATS_TEST_TMPDIR}/stub:${PATH}"
+    mkdir -p "${BATS_TEST_TMPDIR}/stub"
+    printf '#!/bin/sh\nexit 130\n' > "${BATS_TEST_TMPDIR}/stub/fzf"
+    chmod +x "${BATS_TEST_TMPDIR}/stub/fzf"
+    run "${OKM}" recent
+    # exit 0 because okm treats empty fzf selection as a normal no-op exit
+    assert_success
+}
+
+@test "okm recent with one note opens editor without crashing" {
+    mkdir -p "${FAKE_VAULT_DIR}/inbox"
+    echo -e '---\ntitle: "A"\n---' > "${FAKE_VAULT_DIR}/inbox/a.md"
+    export PATH="${BATS_TEST_TMPDIR}/stub2:${PATH}"
+    mkdir -p "${BATS_TEST_TMPDIR}/stub2"
+    # fzf stub: print the first line it receives (simulates selecting the note)
+    printf '#!/bin/sh\nhead -1\n' > "${BATS_TEST_TMPDIR}/stub2/fzf"
+    chmod +x "${BATS_TEST_TMPDIR}/stub2/fzf"
+    export EDITOR="true"
+    run "${OKM}" recent
+    assert_success
+}

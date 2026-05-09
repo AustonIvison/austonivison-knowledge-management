@@ -69,3 +69,15 @@ if [ -d "${KM_ROOT}/venv/bin" ]; then
     [[ ":${PATH}:" != *":${KM_ROOT}/venv/bin:"* ]] && export PATH="${KM_ROOT}/venv/bin:${PATH}"
     export VIRTUAL_ENV="${KM_ROOT}/venv"
 fi
+
+# --- Shell helpers (override global vf/vr to exclude venv/) ---
+# vf: fuzzy-find a file and open it in vim (skips venv/)
+vf() { local file; file=$(rg --files --glob '!venv' | fzf) && vim "$file"; }
+# vr: grep via rg+fzf and open at the matched line (skips venv/)
+vr() {
+  local sel file line
+  sel=$(rg -i --line-number --no-heading --color=never --glob '!venv' "$@" | fzf) || return
+  file=$(echo "$sel" | cut -d: -f1)
+  line=$(echo "$sel" | cut -d: -f2)
+  vim +"$line" "$file"
+}

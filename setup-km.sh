@@ -243,7 +243,7 @@ install_nvim() {
     esac
     curl -fsSL -o "${tmp_dir}/nvim.tar.gz" \
         "https://github.com/neovim/neovim/releases/latest/download/${nvim_tarball}"
-    tar -xf "${tmp_dir}/nvim.tar.gz" -C "${tmp_dir}"
+    tar --no-absolute-file-names -xf "${tmp_dir}/nvim.tar.gz" -C "${tmp_dir}"
 
     # Install binary
     cp "${tmp_dir}/${nvim_dir}/bin/nvim" "${BIN_DIR}/nvim.bin"
@@ -278,6 +278,10 @@ install_lazygit() {
     tmp_dir="$(mktemp -d)"
     version="$(curl -fsSL "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" \
         | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')"
+    if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        log_error "Could not determine lazygit version from GitHub API (got: '${version}')"
+        return 1
+    fi
     local lg_os lg_arch
     case "${PLATFORM_OS}" in
         linux)  lg_os="Linux" ;;
@@ -289,7 +293,7 @@ install_lazygit() {
     esac
     curl -fsSL -o "${tmp_dir}/lazygit.tar.gz" \
         "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${version}_${lg_os}_${lg_arch}.tar.gz"
-    tar -xf "${tmp_dir}/lazygit.tar.gz" -C "${BIN_DIR}" lazygit
+    tar --no-absolute-file-names -xf "${tmp_dir}/lazygit.tar.gz" -C "${BIN_DIR}" lazygit
     chmod +x "${BIN_DIR}/lazygit"
     rm -rf "${tmp_dir}"
     log_info "OK: lazygit installed at ${BIN_DIR}/lazygit"

@@ -76,9 +76,13 @@ slugify() {
 
 # N13+N26: escape backslashes then double-quotes in YAML double-quoted scalars.
 # Backslash must be escaped first so we don't double-escape the quote escapes.
+# Newlines/CRs are stripped to prevent YAML frontmatter injection.
 yaml_escape_dq() {
   local s="${1//\\/\\\\}"
-  printf '%s' "${s//\"/\\\"}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/ }"
+  s="${s//$'\r'/}"
+  printf '%s' "$s"
 }
 
 iso_now() { date -Iseconds; }
@@ -167,7 +171,7 @@ write_tags_line() {
   local file="$1"
   local new_line="$2"
   local tmp
-  tmp="$(mktemp)"
+  tmp="$(mktemp -- "${file}.XXXXXX")"
   awk -v new_line="$new_line" '
     BEGIN { c = 0; replaced = 0; in_after = 0 }
     {
@@ -284,7 +288,7 @@ add_tags() {
 
   if ! has_frontmatter "$file"; then
     local tmp
-    tmp="$(mktemp)"
+    tmp="$(mktemp -- "${file}.XXXXXX")"
     {
       printf -- '---\ntags: []\n---\n'
       cat "$file"
@@ -583,15 +587,25 @@ recent_notes() {
   need_cmd fzf
   local picked
   picked="$(
-    find "$VAULT" -type f -name '*.md' "${PRIVATE_FIND_PRUNE[@]}" -exec stat --format='%Y %n' {} + 2>/dev/null \
-      || find "$VAULT" -type f -name '*.md' "${PRIVATE_FIND_PRUNE[@]}" -print0 | xargs -0 stat -f '%m %N' 2>/dev/null \
+    { find "$VAULT" -type f -name '*.md' "${PRIVATE_FIND_PRUNE[@]}" \
+          -exec stat --format='%Y %n' {} + 2>/dev/null \
+      || find "$VAULT" -type f -name '*.md' "${PRIVATE_FIND_PRUNE[@]}" \
+          -print0 | xargs -0 stat -f '%m %N' 2>/dev/null
+    } \
       | sort -nr \
       | head -200 \
       | cut -d' ' -f2- \
-      | sed "s#^$VAULT/##" \
+      | sed "s#^$(printf '%s' "$VAULT" | sed 's/[#&\\/]/\\&/g')/##" \
       | fzf --height=40% --reverse --border --prompt="recent> "
-  )"
+  )" || true  # fzf exits 130 on Escape/Ctrl-C; treat as empty selection
   [ -n "${picked:-}" ] || exit 0
+  local resolved vault_real
+  resolved="$(realpath -m -- "$VAULT/$picked" 2>/dev/null || true)"
+  vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
+  case "$resolved" in
+    "$vault_real"|"$vault_real"/*) ;;
+    *) echo "Path outside vault: $picked" >&2; exit 1 ;;
+  esac
   exec "$EDITOR_CMD" "$VAULT/$picked"
 }
 
@@ -664,10 +678,10 @@ spot_note() {
     *track*)   spot_type="track" ;;
   esac
 
-  # N16: extract and validate the Spotify ID (must be 20+ alphanumeric chars).
+  # N16: extract and validate the Spotify ID (exactly 22 base62 chars).
   local spot_id embed_url
   spot_id="$(echo "$url" | sed -E 's#.*/[a-z]+/([a-zA-Z0-9]+)(\?.*)?$#\1#')"
-  if [ -z "$spot_id" ] || [[ ! "$spot_id" =~ ^[a-zA-Z0-9]{10,}$ ]]; then
+  if [ -z "$spot_id" ] || [[ ! "$spot_id" =~ ^[a-zA-Z0-9]{22}$ ]]; then
     echo "Invalid Spotify URL: could not extract a valid ID from '$url'" >&2
     exit 1
   fi

@@ -8,6 +8,7 @@
 5. Bugs: write failing reproduction test, then fix until passing. Test must fail without the fix.
 6. On correction: add rule to `.ai-instructions/rules.md` to prevent recurrence.
 7. Caveman speech; minimize tokens, preserve utility.
+8. Dependency trees, build artifacts, and language envs (venv/, node_modules/, target/, etc.) are local noise: gitignore + exclude from all search, never read.
 
 ---
 
