@@ -714,3 +714,66 @@ HOOK
     count=$(find "${HOME}/.local/log" -name "setup-km-*.log" | wc -l)
     [ "$count" -le 5 ]
 }
+
+# =============================================================================
+# Known papercuts from v0 audit — document here, fix in v1
+# =============================================================================
+
+@test "setup-km.sh gives clear error on unsupported platform/arch" {
+    skip "v1: unsupported platform emits confusing 'unbound variable' crash instead of log_error"
+    # install_nvim() and install_lazygit() declare nvim_tarball/nvim_dir and lg_os/lg_arch
+    # but have no *) fallback case. On an unknown PLATFORM_OS/PLATFORM_ARCH the next
+    # variable reference hits set -u and aborts with a cryptic message.
+    # Fix: add *) log_error "Unsupported platform: ${PLATFORM_OS}/${PLATFORM_ARCH}"; return 1 ;;
+    PLATFORM_OS=haiku PLATFORM_ARCH=riscv \
+        run bash -c 'source '"${PROJECT_ROOT}/setup-km.sh"'; install_nvim'
+    assert_failure
+    assert_output --partial "Unsupported"
+}
+
+@test "yaml_escape_dq strips tab characters from titles" {
+    skip "v1: yaml_escape_dq escapes newlines/CRs but not tabs; literal tab leaks into YAML frontmatter"
+    # A title with a raw tab produces: title: "foo\tbar" (literal tab in YAML string).
+    # YAML allows tabs in double-quoted scalars but it breaks some parsers and is unexpected.
+    # Fix: add s="${s//$'\t'/ }" in yaml_escape_dq alongside the \n strip.
+    run "${OKM}" new $'Tab\there'
+    assert_success
+    local file
+    file="$(find "${FAKE_VAULT_DIR}/inbox" -name '*.md' | head -1)"
+    run grep '^title:' "$file"
+    # Must not contain a raw tab character
+    refute_output --regexp $'title:.*\t'
+}
+
+@test "compress-images.py closes image handle before removing original" {
+    skip "v1: Image.open(out).verify() leaves file handle open; on WSL2 this can block os.remove(path)"
+    # Fix: replace Image.open(out).verify() with:
+    #   with Image.open(out) as img: img.verify()
+    # so the handle is closed before the original is deleted.
+    true
+}
+
+@test "setup-km.sh cleans up tmp dirs on failure" {
+    skip "v1: mktemp -d in install_nvim/install_lazygit/install_nerd_font not removed when set -e fires mid-install"
+    # Fix: use a trap ERR / trap EXIT to rm -rf the tmp_dir on any exit path.
+    true
+}
+
+@test "okm recent warns when vault is unreadable instead of showing empty picker" {
+    skip "v1: || true on the find|stat pipeline silently swallows errors; user sees empty fzf with no explanation"
+    # Fix: capture the exit status separately and emit a warning to stderr before
+    # falling through to the empty-selection exit.
+    mkdir -p "${FAKE_VAULT_DIR}/inbox"
+    chmod 000 "${FAKE_VAULT_DIR}/inbox"
+    run "${OKM}" recent
+    chmod 755 "${FAKE_VAULT_DIR}/inbox"
+    assert_output --partial "warn"
+}
+
+@test "okm tagged warns when files with block-style tags are skipped" {
+    skip "v1: list_tagged silently skips block-style-tag files; users get incomplete results with no notice"
+    # Fix: count skipped files and emit a warning: "N note(s) with block-style tags skipped (v1)".
+    create_vault_file "inbox/block.md" "$(printf -- '---\ntags:\n  - foo\n---\nbody')"
+    run "${OKM}" tagged foo
+    assert_output --partial "skipped"
+}

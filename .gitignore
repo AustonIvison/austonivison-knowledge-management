@@ -21,6 +21,15 @@ private-inbox/*.md
 private-archive/*.md
 private-attachments/*
 
+# Installed binaries (built/downloaded by setup-km.sh, not source)
+bin/nvim
+bin/nvim.bin
+bin/lazygit
+
+# Vault notes (excluded when KM_TRACK_NOTES=false; templates always kept)
+inbox/*.md
+!inbox/templates/
+
 # Large or binary attachments (track explicitly if needed)
 attachments/*.pdf
 attachments/*.zip
