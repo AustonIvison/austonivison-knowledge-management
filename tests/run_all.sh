@@ -6,6 +6,9 @@
 #   bash tests/run_all.sh tests/todo_summary.bats  # run one file
 #   bash tests/run_all.sh --filter "TODO marker"   # run matching tests
 #   bash tests/run_all.sh --tap                    # TAP output for CI
+#
+# v1 specs (all skipped until implemented): tests/v1_spec.bats
+# Roadmap: README.md § Roadmap → v1
 
 set -euo pipefail
 

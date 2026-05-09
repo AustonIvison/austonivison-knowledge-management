@@ -1,55 +1,12 @@
-# Objective of this project
-The open-source knowledge OS for Obsidian users who live in Vim, Neovim, and CLI-powered interactions, file-native, and continuously tested.
-
-> **Disclaimer:** Content in this vault (especially financial, health, and investment topics) is for educational purposes only. See [`disclaimer.md`](disclaimer.md) for full terms.
-
-# Market Niche 
-
-Thesis: The open-source knowledge OS for Obsidian users who live in Vim, Neovim, 
-and CLI-powered interactions — file-native, AiCLI-powered, and continuously tested.
-
-This should exist in the developer infrastructure segment of knowledge management: 
-a tool for engineers who treat notes like code, want local markdown/Obsidian-compatible 
-files, and prefer terminal, Vim, and Neovim workflows over heavy app-centric PKM systems.
-
-Its wedge is not “AI note-taking” but a fast, composable, Unix-native knowledge 
-layer that users can trust first for speed, portability, and safe file operations, 
-with Claude/Copilot/Agent (Cursor) added later as an optional multiplier rather 
-than the core dependency.
-
-# Project properties
-
-Extremely fast: Startup and core actions must feel instant, because latency breaks flow for both humans and agents.
-
-Fresh local indexing: Search must reflect recent edits immediately, or users and agents act on stale context.
-
-Composable CLI: Every command should work cleanly in pipes, scripts, JSON output, editors, and CI.
-
-Non-destructive by default: Mutations should prefer dry-runs, diffs, and reversible behavior to preserve trust.
-
-Plain markdown, no lock-in: Files should remain standard, portable, and useful without the tool installed.
-
-Predictable command surface: A small, memorable set of commands beats a sprawling interface.
-
-Editor/toolchain interoperability: The tool should plug naturally into Neovim, LSPs, shell tools, and existing workflows.
-
-Local-first, AI-optional: Core value should work offline and without API keys, with AI layered on top rather than required.
-
-Low operational overhead: Install, memory use, and runtime footprint should stay lightweight enough to disappear into daily use.
-
 # Knowledge Management
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Project
+> **Disclaimer:** Content in this vault (financial, health, investment topics) is for educational purposes only. See [`disclaimer.md`](disclaimer.md).
 
-Offline-first personal knowledge system. Plain Markdown notes managed by the `okm` CLI, visualised in Obsidian, edited in Neovim or Vim. Git handles sync. No cloud dependencies after initial setup.
+Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI — file-native, offline-first, continuously tested. Treats notes like code: plain Markdown, local files, terminal workflows, composable CLI. AI is optional and layered on top.
 
-- **Plain Markdown** — no proprietary format lock-in
-- **Offline by default** — Obsidian's network is revoked at the container level
-- **Privacy-first** — `private-*/` folders are off-limits to AI assistants (see `ai-instructions.md`)
-- **Project-scoped** — `source env.sh` activates; no global configs modified
-- **One script** — `setup-km.sh` is idempotent and safe to re-run
+**Design principles:** instant startup; fresh local indexing; composable CLI (pipes, JSON, CI); non-destructive by default; no lock-in; small memorable command surface; editor/toolchain interop; local-first; lightweight; **ejectable** — every note readable with `cat`/`grep`/any CommonMark renderer, vault survives Obsidian disappearing (see [PVS](#portable-vault-specification-pvs-v10)).
 
 ---
 
@@ -65,214 +22,104 @@ Offline-first personal knowledge system. Plain Markdown notes managed by the `ok
 | ffmpeg / mpv | Audio/video processing | apt |
 | ripgrep / fzf | Search and fuzzy picking | apt |
 
-**Platform support:** Debian/Ubuntu (apt + Flatpak). Auto-detects x86_64 / arm64. Other Linux distros (Fedora/Arch/openSUSE) and macOS are not yet supported — `setup-km.sh` invokes `apt`/`dpkg` directly. Tracked in [roadmap.md](roadmap.md).
+**Platform:** Debian/Ubuntu (apt + Flatpak), x86_64/arm64. macOS and other distros not yet supported.
 
 ---
 
-## Commands
+## Setup
 
-> **Fork first.** The convention is to fork and rename to `{your-github-handle}-knowledge-management` (e.g. `awsaavedra-knowledge-management`) before cloning, and clone *your fork* — not the upstream OSS — so `okm sync` pushes to your repo instead of accidentally publishing private notes to the public project. The vault and the tooling live in the same repo by default.
+> **Fork first.** Fork and rename to `{your-github-handle}-knowledge-management`. Clone *your fork*, not upstream, so `okm sync` pushes to your private repo.
 
 ```bash
-# 1. On GitHub: Fork the upstream repo and rename your fork to
-#    {your-github-handle}-knowledge-management.
-# 2. Clone YOUR fork (not the upstream):
 git clone --recurse-submodules <your-fork-url> ~/projects/knowledge-management
 cd ~/projects/knowledge-management
-
-# (Optional) Custom vault location. Default: sibling directory.
-export OBSIDIAN_VAULT="$HOME/my-vault"
-
-bash setup-km.sh         # install everything (idempotent, safe to re-run)
-source env.sh            # activate project environment
-bash verify-km.sh        # confirm all tools installed
-bash tests/run_all.sh    # run full BATS test suite
+export OBSIDIAN_VAULT="$HOME/my-vault"   # optional; default: sibling dir
+bash setup-km.sh && source env.sh && bash verify-km.sh
+bash tests/run_all.sh
 ```
 
-`--recurse-submodules` pulls the BATS submodules under `tests/lib/` so the test suite runs. If you cloned without it, run `git submodule update --init --recursive`.
+Setup prompt: **Track notes in git?** (default: yes). Pre-set with `KM_TRACK_NOTES=true|false`. Logs at `~/.local/log/setup-km-*.log`.
 
-Setup asks: **Track notes in git?** (default: yes). To skip the prompt, set `KM_TRACK_NOTES=true` or `false` beforehand. Notes tracked = full git history (pair with git-crypt). Notes untracked = local only.
+**Manual steps:** SSH key (`ssh-keygen -t ed25519 -C km-vault`); git remote (`git -C "$(okm path)" remote add origin <url>`); optional git-crypt (see [git-crypt](#advanced-git-crypt)).
 
-Setup logs: `~/.local/log/setup-km-*.log`. For day-to-day commands, see [okm CLI](#okm-cli).
-
-### Quickstart — verify Obsidian, Neovim, and Vim
-
-After `bash setup-km.sh` finishes and you've sourced `env.sh`, seed the demo dataset once and use it to confirm all three editors are wired up:
+### Quickstart — verify editors
 
 ```bash
-bash scripts/seed-demo.sh                  # 11 demo-* files across daily/, inbox/, attachments/, archive/
-okm files demo-                            # confirm what got seeded
+bash scripts/seed-demo.sh    # seed 11 demo-* files
+okm files demo-              # confirm seeded files
+bash scripts/seed-demo.sh --teardown   # clean up
 ```
 
-Then verify each editor in turn. They share the seeded files and the same project-scoped configs.
+**Obsidian:** `okm obs` → open `$(okm path)` as vault on first launch.
+**Neovim:** `nvim daily/demo-$(date +%Y-%m-%d).md` — expect green `PUBLIC PARA · daily` winbar, TODO/FIXME/BUG highlights, `<leader>od/on/os/oo/ob` keymaps. If missing: `NVIM_APPNAME=km nvim --headless "+Lazy! sync" +qa`.
+**Vim:** `EDITOR=vim okm open inbox/demo-meeting-notes.md` — expect green `PUBLIC PARA · inbox` statusline. (`bin/vim` wraps `vim -u config/vim/vimrc`; `bin/` is first on `$PATH` via `env.sh` so `vim` loads project config without touching `~/.vimrc`; wrapper used instead of `$VIMINIT` because nvim also honors it.)
+**Private side test:** `nvim private-inbox/demo-private.md` → red `⚠ PRIVATE PARA` banner.
 
-#### 1. Obsidian (GUI)
+Seeded files:
 
-```bash
-okm obs                                    # launches the Flatpak with network revoked
-```
-
-- First launch: choose **"Open folder as vault"** and point it at `$(okm path)`.
-- In the file tree you should see `daily/demo-YYYY-MM-DD.md`, `inbox/demo-*.md`, `archive/demo-completed-project.md`, `attachments/demo-screenshot.png`.
-- Open `inbox/demo-yt-example.md` — confirm the YAML frontmatter renders, the embedded `![[demo-screenshot.png]]` resolves, and the `## Sources Cited` / `## Actionable Insights` / `## Follow-ups` sections are present.
-- Obsidian has no banner integration yet — the public/private warning is editor-side only (Neovim winbar, Vim statusline). Use the file path itself as the visual cue in Obsidian.
-
-#### 2. Neovim
-
-`setup-km.sh` already ran `Lazy! sync` headlessly during install, so plugins are present.
-
-```bash
-nvim daily/demo-$(date +%Y-%m-%d).md
-```
-
-In that buffer you should see:
-
-| What | Where it comes from |
+| Folder | Files |
 |---|---|
-| Green **winbar** at the top: `PUBLIC PARA · daily` | `config/nvim/lua/config/autocmds.lua` (KMBanner) |
-| Yellow `TODO:`, orange `FIXME:`, red `BUG:` when you type them | `config/nvim/lua/plugins/todo-comments.lua` |
-| `<leader>od / on / os / oo / ob / og` keymaps work | `config/nvim/lua/plugins/obsidian.lua` |
-
-Flip to the private side to confirm the banner turns red:
-
-```bash
-mkdir -p private-inbox && echo '# private test' > private-inbox/demo-private.md
-nvim private-inbox/demo-private.md         # red "⚠ PRIVATE PARA · private-inbox" winbar
-rm private-inbox/demo-private.md
-```
-
-If the banner or highlights are missing, re-run `bash setup-km.sh` (idempotent) or sync plugins manually: `NVIM_APPNAME=km nvim --headless "+Lazy! sync" +qa`.
-
-#### 3. Vim
-
-`bin/vim` is a small wrapper that invokes `vim -u config/vim/vimrc`. Because `bin/` is first on `$PATH` (via `env.sh`), typing `vim` inside the project loads the project vimrc without touching `~/.vimrc`. We use a wrapper instead of `$VIMINIT` because nvim also honors `VIMINIT` and would silently disable LazyVim. The project vimrc sources `~/.vimrc` first so personal settings still apply.
-
-```bash
-EDITOR=vim okm open inbox/demo-meeting-notes.md
-```
-
-You should see:
-
-| What | Where it comes from |
-|---|---|
-| Green **statusline** band: `PUBLIC PARA · inbox` | `config/vim/vimrc` (KMBanner) |
-| Yellow `TODO:`, orange `FIXME:`, red `BUG:` | `config/vim/vimrc` (KMTodoHighlights via `matchadd`) |
-
-The same private-side test works:
-
-```bash
-EDITOR=vim vim private-inbox/demo-private.md  # red "⚠ PRIVATE PARA" statusline
-```
-
-#### Tear down
-
-```bash
-bash scripts/seed-demo.sh --teardown       # removes only demo-* files; real notes untouched
-```
-
-For full reference: [Templates](#templates) · [Demo Dataset](#demo-dataset) · [Workflow](#workflow).
-
-### Manual setup steps (not automated)
-
-- **SSH key** — `ssh-keygen -t ed25519 -C km-vault` then add to git host
-- **Git remote** — `git -C "$(okm path)" remote add origin <url>`
-- **git-crypt** — optional, initialise before first push (see [Advanced: git-crypt](#advanced-git-crypt))
-
----
-
-## Architecture
-
-> **Maintenance:** keep the tree below in sync with disk. Update after any major refactor (file moves, renames, new top-level dirs).
-
-```
-.
-├── env.sh                          # source to activate
-├── setup-km.sh                     # idempotent bootstrap
-├── verify-km.sh                    # post-install checks
-├── ai-instructions.md              # AI assistant rules
-├── bin/
-│   ├── okm                         # vault CLI (tracked)
-│   ├── nvim                        # neovim (gitignored, setup creates)
-│   └── lazygit                     # lazygit (gitignored, setup creates)
-├── config/
-│   ├── nvim/                       # NVIM_APPNAME=km → ~/.config/km/
-│   ├── lazygit/                    # LG_CONFIG_FILE → no global symlink
-│   └── mpv/                        # MPV_HOME → screenshot config (generated)
-├── scripts/
-│   ├── todo-summary.sh             # PARA TODO scanner → yearly file (cron: 07/12/15:00)
-│   ├── weekly-tasks.sh             # PARA TODO scanner → weekly file (cron: 07/12/15:00)
-│   └── compress-images.py          # PNG/JPG → WebP (cron: 17:00)
-├── tests/                          # BATS test suite
-├── _skills/                        # AI skills library (extensible)
-└── venv/                           # Python venv (gitignored, setup creates)
-
-../knowledge-management/            # vault (override with $OBSIDIAN_VAULT)
-├── daily/                          # Areas — one file per day (YYYY-MM-DD.md)
-├── inbox/                          # Projects — named notes, quick captures, active work
-├── attachments/                    # Resources — images, PDFs, screenshots
-├── archive/                        # Archive — completed/inactive notes (manual move)
-└── private-*/                      # Mirror of above; off-limits to AI assistants
-```
-
-Vault follows [Tiago Forte's PARA method](https://fortelabs.com/blog/para/):
-
-| PARA bucket | Folder | What goes here |
-|---|---|---|
-| **Projects** | `inbox/` | Active notes with a clear end goal — ideas, drafts, research |
-| **Areas** | `daily/` | Ongoing responsibilities — daily logs, recurring reviews |
-| **Resources** | `attachments/` | Reference material — images, PDFs, screenshots |
-| **Archive** | `archive/` | Completed or inactive notes — moved here during review |
-
-`private-{daily,inbox,attachments,archive}/` mirror the public PARA folders for AI-private content.
-
----
-
-## Rules
-
-- **Fork before sharing.** Always work in `{your-handle}-knowledge-management` (your fork), never the upstream OSS. `okm sync` pushes to whatever git remote `origin` points at — that's your responsibility to set correctly.
-- **`private-*/` is local-only by default.** `setup-km.sh` writes a vault `.gitignore` that excludes `private-{daily,inbox,archive}/*.md` and `private-attachments/*` regardless of `KM_TRACK_NOTES`. Opt in (e.g. with git-crypt) by removing those lines yourself.
-- **Secrets are never tracked.** The vault `.gitignore` excludes `.env*`, `*.pem`, `*.key`, `*.crt`, `*credentials*`, `id_rsa*`, and `id_ed25519*` regardless of any other setting.
-- AI assistants don't read `private-*/` paths — see `ai-instructions.md`
-- `okm grep`/`tags`/`files`/`tagged`/`recent` skip `private-*/` by default. Set `KM_INCLUDE_PRIVATE=1` to scan them. Explicit paths (`okm tags private-inbox/x.md`, `okm open private-inbox/x.md`) always work — the default only affects vault-walking commands.
-- Update the Architecture tree above after any major refactor (file moves, renames, new top-level dirs)
-- Notes are plain Markdown — no proprietary fields, no cross-tool dependencies
-- Project-scoped — never modify the user's global configs (`~/.config/nvim`, `~/.zshrc`, etc.)
-- **WSL2 note:** `setup-km.sh` installs a Nerd Font to Windows user fonts and registers it in the Windows registry (`HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts`). It may also update Windows Terminal `settings.json`. Disable with `KM_INSTALL_FONT=0` before running setup.
-- IMPORTANT: this stack is offline-first — don't introduce cloud dependencies in the core flow
+| `daily/` | `demo-YYYY-MM-DD.md` |
+| `inbox/` | `demo-meeting-notes.md`, `demo-capture.md`, `demo-yt-example.md`, `demo-spotify-episode.md`, `demo-spotify-track.md`, `demo-podcast.md`, `demo-todo-summary-YYYY.md`, `demo-weekly-*.md` |
+| `attachments/` | `demo-screenshot.png` (1×1 placeholder) |
+| `archive/` | `demo-completed-project.md` |
 
 ---
 
 ## Workflow
 
-Pick your editor:
-
-| Editor | Command | Notes |
+| Editor | Launch | Notes |
 |---|---|---|
-| **Obsidian** | `okm obs` | First launch: open `$(okm path)` as vault |
-| **Neovim** | `okm today` | Project config via `NVIM_APPNAME=km` |
-| **Vim** | `EDITOR=vim okm today` | Project vimrc via `bin/vim` wrapper (sources `~/.vimrc` first); TODO/FIXME/BUG colored |
+| Obsidian | `okm obs` | First launch: open `$(okm path)` as vault |
+| Neovim | `okm today` | Project config via `NVIM_APPNAME=km` |
+| Vim | `EDITOR=vim okm today` | Project vimrc via `bin/vim`; sources `~/.vimrc` first |
 
-- **Capture**: `okm today` (daily note) or `okm capture <text>` (timestamped)
-- **Search**: `okm grep <pattern>` (content) or `okm files [pattern]` (paths)
-- **Sync**: `okm sync [message]` — stages all, commits, rebases, pushes
-- **Test before merge**: `bash tests/run_all.sh`
-- **Commit conventions**: one logical change per commit; `okm sync` defaults to `vault sync YYYY-MM-DD HH:MM:SS`
-- **Ask before**: destructive ops (`rm -rf`, force push), scope creep beyond requested files
-
-For auto-activation with [direnv](https://direnv.net/), the repo includes `.envrc`. Run `direnv allow .` to activate it.
+- **Capture:** `okm today` (daily note) or `okm capture <text>` (timestamped)
+- **Search:** `okm grep <pattern>` (content) or `okm files [pattern]` (paths)
+- **Sync:** `okm sync [message]` — default commit message: `vault sync YYYY-MM-DD HH:MM:SS`
+- **Test before merge:** `bash tests/run_all.sh`
+- **Commit conventions:** one logical change per commit; ask before destructive ops or scope creep
+- **Auto-activation:** `direnv allow .` (repo includes `.envrc`)
 
 ---
 
-## Out of scope
+## Architecture
 
-| Item | Reason |
-|---|---|
-| `private-*/` note bodies | AI-private; only structural metadata is read |
-| `_skills/` content | Manually curated; agents don't auto-modify |
-| `disclaimer.md` | Manually maintained legal text |
-| `okm link/backlinks/stats` | One-liner `rg` commands, not worth subcommands |
-| `okm archive/template` | Obsidian handles this; daily notes are small |
-| Auto-sync cron | Silent pushes are risky; `okm sync` is intentional |
+```
+.
+├── env.sh / setup-km.sh / verify-km.sh
+├── ai-instructions.md
+├── bin/okm                         # vault CLI
+├── config/nvim/                    # NVIM_APPNAME=km → ~/.config/km/
+├── config/lazygit/ / config/mpv/
+├── scripts/todo-summary.sh         # PARA TODO scanner (cron)
+├── scripts/weekly-tasks.sh         # weekly summary (cron)
+├── scripts/compress-images.py      # PNG/JPG → WebP (cron)
+├── tests/                          # BATS suite
+├── _skills/                        # AI skills library
+└── venv/                           # Python venv (gitignored)
+
+../knowledge-management/            # vault (override: $OBSIDIAN_VAULT)
+├── daily/          # Areas — one file per day
+├── inbox/          # Projects — active notes and captures
+├── attachments/    # Resources — images, PDFs
+├── archive/        # Archive — completed notes
+└── private-*/      # Mirror of above; AI-private
+```
+
+Vault follows [PARA](https://fortelabs.com/blog/para/). `private-{daily,inbox,attachments,archive}/` mirror each public folder.
+
+---
+
+## Rules
+
+- **Fork before sharing.** Work in your fork; `okm sync` pushes to whatever `origin` points at.
+- **`private-*/` is local-only by default.** Excluded from git regardless of `KM_TRACK_NOTES`. Opt in with git-crypt.
+- **Secrets never tracked.** `.gitignore` excludes `.env*`, `*.pem`, `*.key`, `*.crt`, `*credentials*`, `id_rsa*`, `id_ed25519*`.
+- AI assistants don't read `private-*/` — see `ai-instructions.md`.
+- `okm grep/tags/files/tagged/recent` skip `private-*/` by default (`KM_INCLUDE_PRIVATE=1` to scan).
+- Never touch user global configs (`~/.config/nvim`, `~/.zshrc`, etc.).
+- **WSL2:** setup installs a Nerd Font to Windows fonts and may update Windows Terminal. Disable: `KM_INSTALL_FONT=0`.
 
 ---
 
@@ -283,255 +130,375 @@ For auto-activation with [direnv](https://direnv.net/), the repo includes `.envr
 | `okm today` | Open/create today's daily note |
 | `okm new <title>` | Create slugified note in `inbox/` with frontmatter |
 | `okm capture [text]` | Timestamped quick-capture note |
-| `okm spot <spotify-url>` | Create note from Spotify link (episode, track, album, playlist) |
+| `okm spot <url>` | Create note from Spotify link (episode, track, album, playlist) |
 | `okm open [path]` | Open a note or launch fzf picker |
 | `okm grep <pattern>` | ripgrep across all `.md` files |
-| `okm files [pattern]` | List all `.md` paths, optionally filtered |
-| `okm recent` | fzf picker over 200 most recently modified notes |
+| `okm files [pattern]` | List `.md` paths, optionally filtered |
+| `okm recent` | fzf picker over 200 recently modified notes |
 | `okm sync [message]` | `git add -A` → commit → `pull --rebase` → push |
-| `okm tags [note]` | List all tags with counts, or tags for a specific note |
-| `okm tag <note> <tag> [...]` | Add tag(s) to a note's frontmatter |
-| `okm untag <note> <tag> [...]` | Remove tag(s) from a note's frontmatter |
-| `okm tagged <tag>` | List all notes with a given tag |
+| `okm tags [note]` | List tags with counts, or tags for a note |
+| `okm tag / untag` | Add/remove tags from frontmatter |
+| `okm tagged <tag>` | List notes with a given tag |
+| `okm audit` | Scan for PARA content, secrets, sensitive filenames |
 | `okm obs` | Launch Obsidian GUI |
 | `okm path` | Print vault path |
 
-`okm new`, `okm capture`, and `okm spot` accept `-t tag1,tag2` to set tags at creation time.
+`okm new`, `capture`, `spot` accept `-t tag1,tag2`.
 
-### Environment variables
-
-Set by `source env.sh`:
+**Environment variables** (set by `source env.sh`):
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `OBSIDIAN_VAULT` | `../knowledge-management` | Vault root |
 | `OBSIDIAN_DAILY_DIR` | `daily` | Where `okm today` writes |
-| `OBSIDIAN_NOTES_DIR` | `inbox` | Where `okm new` / `okm capture` write |
-| `EDITOR` | `nvim` | Editor for all note commands |
-| `KM_TRACK_NOTES` | `true` | Track notes in git (`false` = gitignored) |
+| `OBSIDIAN_NOTES_DIR` | `inbox` | Where `okm new`/`capture` write |
+| `EDITOR` | `nvim` | Editor for note commands |
+| `KM_TRACK_NOTES` | `true` | Track notes in git |
 
 ---
 
 ## Neovim
 
-Config: `config/nvim/lua/plugins/obsidian.lua` via `NVIM_APPNAME=km` → `~/.config/km/`. Your global `~/.config/nvim` is not affected.
+Config via `NVIM_APPNAME=km` → `~/.config/km/`. Global `~/.config/nvim` unaffected.
 
-| Keymap | Command | What it does |
-|---|---|---|
-| `<leader>od` | `:ObsidianToday` | Open today's daily note |
-| `<leader>on` | `:ObsidianNew` | Create new note in `inbox/` |
-| `<leader>os` | `:ObsidianSearch` | Full-text search (ripgrep + fzf) |
-| `<leader>oo` | `:ObsidianQuickSwitch` | Quick switch between notes |
-| `<leader>ob` | `:ObsidianBacklinks` | Show notes linking to current note |
-| `<leader>ot` | `:ObsidianTemplate` | Insert template |
-| `<leader>op` | `:ObsidianPasteImg` | Paste image into attachments/ |
-| `<leader>og` | `:ObsidianOpen` | Open current note in Obsidian GUI |
+| Keymap | What it does |
+|---|---|
+| `<leader>od/on/os/oo` | Today / New / Search / Quick-switch |
+| `<leader>ob/ot/op/og` | Backlinks / Template / Paste image / Open in Obsidian |
 
 ---
 
 ## Media Transcription
 
-Transcribe podcasts, YouTube videos, Spotify episodes, and local audio into searchable notes.
+| Source | Command | Status |
+|---|---|---|
+| YouTube | `okm yt <URL>` | **Planned** |
+| Spotify | `okm spot <URL>` | Shipped |
+| Local audio | `okm pod <file> "Title"` | **Planned** |
+| Summarise | `okm distill <note>` (Claude / Ollama) | **Planned** |
 
-### Toolchain
-
-| Tool | Role |
-|---|---|
-| yt-dlp / youtube-transcript-api | YouTube transcript + audio download |
-| spotdl | Spotify metadata + audio download |
-| whisperX (large-v3-turbo) | Local transcription with speaker diarization |
-| ffmpeg | Audio format conversion |
-| mpv | Video playback with screenshot capture (`s` key → `attachments/`) |
-
-### Workflow
-
-| Source | Command | Network? | Status |
-|---|---|---|---|
-| YouTube (has captions) | `okm yt <URL>` | One-time fetch | **Planned** |
-| YouTube (no captions) | `okm yt <URL>` → whisperX | Fetch + local | **Planned** |
-| Spotify episode | `okm spot <URL>` → `spotdl` | One-time fetch | Shipped |
-| Spotify track/album/playlist | `okm spot <URL>` | One-time fetch | Shipped |
-| Podcast | Check [Happy Scribe](https://podcasts.happyscribe.com) first | One-time fetch | Manual |
-| Local audio | `okm pod <file> "Title"` | Fully offline | **Planned** |
-| Summarise | `okm distill <note>` or `okm distill --local <note>` | Claude / Ollama | **Planned** |
-
-### Note anatomy
-
-Templates live in `inbox/templates/` — one file per markdown type the system produces. Each starts with a `Format Specification:` HTML comment block declaring required frontmatter, sections, and the producing command/script. See [Templates](#templates) for the full list.
-
-**YouTube notes** (`okm yt` — planned, see [roadmap.md](roadmap.md)):
-
-| Section | How it's produced |
-|---|---|
-| Frontmatter (source_type, url, author, tags) | Auto-generated |
-| Thumbnail (`![[file.png]]`) | Auto-saved |
-| Summary (3-5 caveman-speech bullets) | `okm distill` (planned) or manual |
-| Structured data table | `okm distill` (planned) or manual |
-| Key quotes (`> [MM:SS] "..."`) | `okm distill` (planned) or manual |
-| Screenshots (`![[screenshot.png]]`) | mpv `s` key during playback |
-| Timestamps (chapter markers) | Auto-extracted |
-| Transcript (full text) | Fetched or whisperX |
-
-**Spotify notes** (`okm spot`):
-
-| Section | How it's produced |
-|---|---|
-| Frontmatter + player embed iframe | Auto-generated |
-| Summary + key quotes + transcript | Episodes only — `okm distill` (planned) or manual |
-| Notes section | Tracks/albums/playlists — lighter template |
-
-**Summary style:** short sentences, no filler, bullets over paragraphs, numbers over prose, tables for structured data.
+Tools: yt-dlp, spotdl, whisperX (large-v3-turbo), ffmpeg, mpv (`s` key → screenshot to `attachments/`).
 
 ---
 
 ## Templates
 
-`inbox/templates/` holds one canonical template per markdown file type. Each begins with a `<!-- Format Specification: ... -->` block declaring required frontmatter, required sections, and the producing command. Use these as references when writing notes by hand or when the LLM needs to know what a "podcast note" should look like.
+`inbox/templates/` — one canonical template per note type with a `<!-- Format Specification: -->` block.
 
-| Template | Producer | Purpose |
-|---|---|---|
-| `daily-template.md` | `okm today` | Daily note (Captures / Notes / Tasks / Reflection) |
-| `note-template.md` | `okm new <title>` | Generic project note (Context / Notes / Links) |
-| `capture-template.md` | `okm capture [text]` | Timestamped quick-capture |
-| `yt-template.md` | `okm yt <URL>` (**planned**) + mpv | YouTube video with screenshots, quotes, transcript |
-| `spotify-episode-template.md` | `okm spot <URL>` | Spotify episode (transcript flow) |
-| `spotify-track-template.md` | `okm spot <URL>` | Track / album / playlist (no transcript) |
-| `podcast-template.md` | `okm pod <file> "Title"` (**planned**) | Local audio transcribed via whisperX |
-| `todo-summary-template.md` | `scripts/todo-summary.sh --output` | Yearly PARA TODO scan (cron) |
-| `weekly-template.md` | `scripts/weekly-tasks.sh --output` | Weekly task summary (cron) |
-| `archive-template.md` | manual move to `archive/` | Archived note with `archived_date` + `archive_reason` |
-
----
-
-## Demo Dataset
-
-Populate the public PARA folders with demo content derived from the templates so you can exercise every part of the system end-to-end.
-
-```bash
-bash scripts/seed-demo.sh             # seed demo-* files (idempotent)
-# ...verify with the printed checklist (okm files demo-, okm grep, okm today, ...)
-bash scripts/seed-demo.sh --teardown  # remove every demo-* file
-bash scripts/seed-demo.sh --help      # usage
-```
-
-What gets seeded (11 files, all gitignored automatically):
-
-| Folder | Files |
+| Template | Producer |
 |---|---|
-| `daily/` | `demo-YYYY-MM-DD.md` |
-| `inbox/` | `demo-meeting-notes.md`, `demo-capture.md`, `demo-yt-example.md`, `demo-spotify-episode.md`, `demo-spotify-track.md`, `demo-podcast.md`, `demo-todo-summary-YYYY.md`, `demo-weekly-START-to-END.md` |
-| `attachments/` | `demo-screenshot.png` (1×1 placeholder) |
-| `archive/` | `demo-completed-project.md` |
-
-Demo content is **only seeded into the public PARA folders**. The `private-*/` mirrors are never touched — banners are how you tell which side you're editing on.
+| `daily-template.md` | `okm today` |
+| `note-template.md` | `okm new` |
+| `capture-template.md` | `okm capture` |
+| `yt-template.md` | `okm yt` (planned) |
+| `spotify-episode-template.md` / `spotify-track-template.md` | `okm spot` |
+| `podcast-template.md` | `okm pod` (planned) |
+| `todo-summary-template.md` / `weekly-template.md` | cron scripts |
+| `archive-template.md` | manual |
 
 ---
 
 ## Cron Jobs
 
-| Schedule | Script | What it does |
+| Schedule | Script | Output |
 |---|---|---|
-| 07:00, 12:00, 15:00 | `todo-summary.sh --output` | PARA-structured TODO scan → `inbox/todo-summary-YYYY.md` |
-| 07:00, 12:00, 15:00 | `weekly-tasks.sh --output` | PARA-structured TODO scan → `inbox/weekly-DATE-to-DATE.md` |
-| 17:00 | `compress-images.py` | Convert PNG/JPG/GIF → WebP, update `![[wikilinks]]` |
+| 07:00, 12:00, 15:00 | `todo-summary.sh --output` | `inbox/todo-summary-YYYY.md` |
+| 07:00, 12:00, 15:00 | `weekly-tasks.sh --output` | `inbox/weekly-DATE-to-DATE.md` |
+| 17:00 | `compress-images.py` | PNG/JPG → WebP |
 
-**PARA mapping for TODO scanner:**
-
-| Marker | PARA bucket |
-|---|---|
-| `TODO:` `FIXME:` `HACK:` `XXX:` | **Projects** |
-| `- [ ]` unchecked tasks | **Areas** |
-| `REVIEW:` | **Resources** |
+TODO → PARA: `TODO/FIXME/HACK/XXX` = Projects, `- [ ]` = Areas, `REVIEW:` = Resources.
 
 ```bash
-bash scripts/todo-summary.sh              # print to stdout
-bash scripts/todo-summary.sh --output     # write yearly living doc
-```
-
-**System crontab** — replace `$KM` with your project path:
-```bash
-3 7 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
-3 12 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
-3 15 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
-0 7 * * * /usr/bin/bash $KM/scripts/weekly-tasks.sh --output
-0 12 * * * /usr/bin/bash $KM/scripts/weekly-tasks.sh --output
-0 15 * * * /usr/bin/bash $KM/scripts/weekly-tasks.sh --output
-0 17 * * * $KM/venv/bin/python $KM/scripts/compress-images.py
+# Replace $KM with project path
+3 7,12,15 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
+0 7,12,15 * * * /usr/bin/bash $KM/scripts/weekly-tasks.sh --output
+0 17 * * *      $KM/venv/bin/python $KM/scripts/compress-images.py
 ```
 
 ---
 
 ## Git Sync
 
-`okm sync [message]` stages all, commits, rebases, pushes. Skips push if no upstream.
-
-For advanced operations: `lazygit -p "$(okm path)"` or `git -C "$(okm path)" <cmd>`.
-
-```bash
-ssh-keygen -t ed25519 -C "km-vault" -f ~/.ssh/id_ed25519
-git -C "$(okm path)" remote add origin git@github.com:user/repo.git
-```
+`okm sync [message]` — stages all, commits, rebases, pushes. Skips if no upstream.
+Advanced: `lazygit -p "$(okm path)"` or `git -C "$(okm path)" <cmd>`.
 
 ---
 
 ## Advanced: git-crypt
 
-Optional. Encrypts `daily/*.md` and `inbox/*.md` in the remote repo (AES-256-CTR). Plaintext locally, opaque blobs on remote. Single symmetric key, no GPG.
+Encrypts `daily/*.md` and `inbox/*.md` in the remote (AES-256-CTR). Plaintext locally, opaque on remote.
 
 ```bash
-sudo apt install git-crypt
-cd "$(okm path)"
-git-crypt init
-git-crypt export-key ~/git-crypt-km.key    # BACK THIS UP — only way to decrypt
-
-cat >> .gitattributes <<'EOF'
-daily/*.md filter=git-crypt diff=git-crypt
-inbox/*.md filter=git-crypt diff=git-crypt
-EOF
-
+sudo apt install git-crypt && cd "$(okm path)" && git-crypt init
+git-crypt export-key ~/git-crypt-km.key   # BACK THIS UP
+printf 'daily/*.md filter=git-crypt diff=git-crypt\ninbox/*.md filter=git-crypt diff=git-crypt\n' >> .gitattributes
 git add .gitattributes && git commit -m "configure git-crypt"
+# New machine: git clone <url> && git-crypt unlock ~/git-crypt-km.key
 ```
 
-Unlock on new machine: `git clone <url> && cd repo && git-crypt unlock ~/git-crypt-km.key`
-
-**Risks:** key loss = permanent data loss. Key exposure = all history compromised. Pre-init commits stay plaintext. Filenames/timestamps not encrypted.
+**Risks:** key loss = permanent data loss. Key exposure = all history compromised. Pre-init commits and filenames stay plaintext.
 
 ---
 
 ## Offline Mode
 
-All tools run offline. Network only for explicit `git push/pull`.
-
 | Tool | Enforcement |
 |---|---|
-| Obsidian | Flatpak sandbox `--unshare=network` |
+| Obsidian | Flatpak `--unshare=network` |
 | lazygit | `update.method: never` |
 | lazy.nvim | `checker = { enabled = false }` |
-| ripgrep, fzf, okm, vim | No network capability |
+
+---
+
+## Out of scope
+
+`private-*/` bodies (AI-private) · `_skills/` (manually curated) · `okm link/backlinks/stats` (one-liner `rg`) · `okm archive/template` (Obsidian handles) · auto-sync cron (silent push risk)
 
 ---
 
 ## Roadmap
 
-The full roadmap, critique, and ship plan live in **[roadmap.md](roadmap.md)**.
+> Plan-of-record. Audit trail lives in git log. **v0 is the stable release — all v1+ work builds on top of it. Stabilise v0 fully before advancing.**
 
-**Current state:** suite is green (292 tests, 0 failures). v0 is **yellow, not green** — four review passes have surfaced bugs the previous pass missed (B1–B5, F1–F7, N1–N25), and a fuzz/property-test harness over `bin/okm` is the recommended final gate before tagging v0.
+| Version | Status | Theme |
+|---|---|---|
+| **v0** | ✅ shipped | Core vault CLI, privacy boundary, hardened input |
+| **v1** | 🟡 in design | Fork-safety, edge-case bugs, tagging gaps |
+| **v2** | 🔵 planned | Media ingest, macOS, encryption, performance |
+| **v3** | 🔵 planned | Portable Vault Specification (PVS) |
 
-`roadmap.md` covers:
+### v0 — shipped
 
-- **[Scope by Version](roadmap.md#scope-by-version)** — what lands in v0, v1, and v2 (table)
-- **[Recommended Ship Plan](roadmap.md#recommended-ship-plan)** — clustered fixes in merge order
-- **[Pre-v0 Blockers](roadmap.md#pre-v0-blockers)** (B1–B5) and **[Known Bugs](roadmap.md#known-bugs)** (F1–F7)
-- **Findings by review pass** — [second](roadmap.md#second-pass-findings) (N1–N9), [third](roadmap.md#third-pass-findings) (N10–N15), [fourth](roadmap.md#fourth-pass-findings) (N16–N25 + fuzz harness)
-- **[Tagging Gaps](roadmap.md#tagging-gaps-to-close)**, **[Polish](roadmap.md#polish)**, and **[Planned Features](roadmap.md#planned-features)** (`okm yt` / `pod` / `distill`, macOS, git-crypt init, …)
-- **[Skills Roadmap](roadmap.md#skills-roadmap)** — already-shipped editor and template skills
+| Cluster | Summary |
+|---|---|
+| **Tagging** | Boundary regex, injection-safe dedup, frontmatter-less handling, hierarchical tags via awk |
+| **Privacy** | Vault `.gitignore`; `private-*/` exclusion; `okm audit`; fork-safety docs |
+| **Path safety** | `okm open`/`sync` vault-boundary checks; `list_notes` excludes `.git/` |
+| **Input validation** | YAML escaping; slug fail-closed; Spotify ID validation; `validate_tag` on flags |
+| **Templates** | Single-source placeholder substitution across all four producers |
+| **Fuzz gate** | BATS property-test harness (Unicode/quotes/slashes/newlines/empty/long) |
+| **Test/CI** | 280+ BATS tests isolated via `FAKE_VAULT_DIR`; CI green on main |
+| **Skills** | PARA banners (nvim/vim); typed templates; `seed-demo.sh`; direnv; distill prompt |
+
+**Don't regress in v1+:** 280+ BATS tests isolated via `FAKE_VAULT_DIR` + fake `$HOME` · `scripts/lib/scan.sh` shared library (not duplicated) · idempotent `setup-km.sh`/`okm new/today/spot` · `verify-km.sh` exit-code discipline (FAIL blocks, WARN doesn't) · `_skills/`/`private-*` privacy boundary · minimal correct CI.
+
+### v1 — in design
+
+Full specs + reproduction steps: `tests/v1_spec.bats`.
+
+| Item | Code |
+|---|---|
+| **Fork-safety** (`okm port`) | See [Fork-safety](#fork-safety-architecture) |
+| Block-style YAML tolerant read | B3 |
+| `okm sync` extension check | — |
+| `okm private <subcmd>` | — |
+| `okm audit --json` + pre-commit hook | — |
+| `okm rename-tag` / `okm tags --json` | — |
+| `-t` on `okm today` | — |
+| `okm spot` metadata fetch + URL escape | N9 |
+| `KM_TRACK_NOTES` default unification | F6 |
+| `has_frontmatter` HR false positive | N30 |
+| `write_tags_line` permission clobber | N31 |
+| macOS support | — |
+| `okm crypt init` | — |
+| README dual-mode diagram | N6 |
+| `verify-km.sh` direnv check | N8 |
+| Polish: log rotation, `sync -m`, `okm version`, decouple cron tests | N7, F7 |
+
+### v2 — planned
+
+| Item | Notes |
+|---|---|
+| `okm yt` / `okm pod` | YouTube transcript; local audio → whisperX |
+| `okm distill` | AI summary (Claude + Ollama backends) |
+| `okm online`/`offline` | Network-state toggle |
+| HuggingFace token | pyannote speaker diarization |
+| fzf tag picker / private PARA mirror | |
+| `#inline-tags` scanning | **Defer to v3** — Tier-1 or Tier-2? |
+| Tag aliasing | Name equivalence (orthogonal to `aliases:` field) |
+| ~~Hierarchical tags~~ | **Superseded by PVS §2** (flat-only) |
+| **Rust mirror** | Port slow utils after patterns stabilize |
+
+### v3 — planned (PVS)
+
+| Item | Notes |
+|---|---|
+| Standard markdown links | Migrate `[[wikilinks]]` → `[text](path.md)` in templates/`seed-demo.sh` |
+| Frontmatter schema + `VAULT_SCHEMA.md` | Allowlist: `title date modified tags aliases status type source` |
+| `okm audit` PVS rules | Wikilinks, undoc'd keys, query blocks without snapshots, Tier-2 without fallback |
+| Tier-2 artifact policy | `.canvas`/`.base`/`.excalidraw.md` need Tier-1 export or fallback note |
+| Query block snapshots | Static tables paired with queries; script regenerates on schedule |
+| `#inline-tags` + hierarchical tags | Resolve v2 deferrals; PVS §2 currently flat-only |
+
+**Crosswalk:** v0 templates Tier-1 compliant. v1 block YAML compatible with PVS §2. v2 hierarchical tags superseded by §2. Tag aliasing orthogonal.
+
+---
+
+## Fork-safety architecture
+
+Goal: accidental pushes to upstream *structurally impossible*. Two topologies under evaluation.
+
+### Approach A — asymmetric remotes
+
+`origin` → private user repo · `upstream` → public OSS (fetch-only, push URL `DISABLED`) · pre-push hook blocklists upstream (override: `KM_ALLOW_UPSTREAM_PUSH=1`) · `okm sync` refuses if `origin` matches upstream. `okm sync` follows `@{u}` via bare `git push` (`bin/okm:639`) — safe once topology is set.
+
+**`okm port <handle> [--public] [--no-push]`:** `gh` auth + `okm audit` → create private repo → rename/disable upstream → add new origin → install hook → push.
+
+*Pro:* minimal delta from v0. *Con:* vault shares git history with app; PRs need throwaway fork. Full spec + hook content: `tests/v1_spec.bats`.
+
+### Approach B — two-repo split
+
+**B1 (submodule):** private repo contains public app as `app/` submodule; vault in `vault/`.
+**B2 (side-by-side):** public repo for code; `OBSIDIAN_VAULT` env var (already at `bin/okm:5-16`) points to separate private vault.
+
+*Pro:* no shared history; clean fork/PR; B2 is near-zero code change. *Con:* must extract vault dirs from public repo; `okm sync` semantics change.
+
+### Defense-in-depth (both)
+
+`.gitignore`: `vault/ data/ notes/ personal/ *.pem *.key *.db *.sqlite *.env` · Gitleaks pre-commit hook (`gitleaks v8.18.0`) · GitHub server-side push protection (Settings → Code security).
+
+### Contributing back
+
+```bash
+git remote add myfork git@github.com:{handle}/knowledge-management.git
+git checkout -b feature/foo && git push myfork feature/foo
+# PR: myfork/feature/foo → upstream/main
+```
+
+### Decision
+
+**A** if: minimal change acceptable, hooks sufficient. **B2** if: structural impossibility preferred, one-time vault extraction OK. **Pragmatic:** ship A first, evaluate B after real usage.
+
+**Open questions:** Which approach? · `gh` as new dep (recommend: add to `setup-km.sh`) · `okm port --adopt` for existing forks · `verify-km.sh` post-port topology check · README "Privacy & Personal Data" section.
+
+**Tests:** BATS with fake `gh` shim; integration against local bare repo; `okm sync` against misconfigured `origin` must refuse; B2 `$OBSIDIAN_VAULT` outside app repo with its own remote.
+
+---
+
+## Portable Vault Specification (PVS) v1.0
+
+Every note readable with `cat`/`grep`/any CommonMark renderer without Obsidian. Ref: [thymer.com/ejectable](https://thymer.com/ejectable).
+
+### §0. Artifact tiers
+
+| Tier | Type | Examples | Portable? |
+|---|---|---|---|
+| **1 – Core** | Plain markdown + YAML frontmatter | `.md`, attachments | ✅ |
+| **2 – Derived** | Obsidian-aware, reconstructable | `.canvas`, `.base`, `.excalidraw.md` | ⚠️ w/ fallback |
+| **3 – Opaque** | App/plugin state | `.obsidian/`, live query output | ❌ |
+
+Rule 0: Tier-3 never sole record. Tier-2 must have Tier-1 fallback. Tier-1 is source of truth.
+
+### §1. Link format
+
+**MUST** use `[Display](relative/path.md)` — no `[[wikilinks]]`. Relative paths only. Heading anchors OK.
+
+### §2. YAML frontmatter
+
+```yaml
+---
+title: string
+date: YYYY-MM-DD
+modified: YYYY-MM-DD
+tags: [flat, list]       # no nested taxonomies
+aliases: [list]
+status: draft|active|archived
+type: note|moc|log|ref|project
+source: url-or-citation
+---
+```
+
+Plugin keys allowed only if valid YAML strings + documented in `VAULT_SCHEMA.md`.
+
+### §3. Query blocks
+
+Every query block must include a static snapshot:
+
+````markdown
+```dataview
+TABLE date, status FROM #project WHERE status = "active"
+```
+<!-- Static snapshot updated: 2026-05-01 -->
+| Title | Date | Status |
+````
+
+### §4. Ejectability properties
+
+| Property | Requirement |
+|---|---|
+| **Completeness** | Bundle: all notes, attachments, config, static fallbacks |
+| **Self-hostability** | Fresh machine opens vault in neovim via `neovim/install.sh` |
+| **Continuity** | Every Obsidian workflow has named fallback; degradation documented |
+| **Reversibility** | Notes move Obsidian ↔ neovim without repair |
+| **Link integrity (U1)** | Every relative link resolves — `scripts/link-integrity.sh` must exit 0 |
+| **MVR compatibility (U2)** | Any app satisfying the MVR contract can open the vault |
+| **Threat model (U3)** | `VAULT_SCHEMA.md` documents each dependency + mitigation |
+| **Ejection runbook (U4)** | `EJECT.md`: neovim / any editor / read-only options + "What you will lose" |
+| **Observability (U5)** | `scripts/ejectability-check.py` reports portability debt continuously |
+
+**MVR contract** (Minimum Viable Reader — the bar any app must clear):
+
+| Capability | Level |
+|---|---|
+| Render CommonMark; parse YAML 1.1; follow relative links; render code blocks + tables; list files | MUST |
+| Full-text search; resolve backlinks | SHOULD |
+
+**Threat model scenarios** (document each in `VAULT_SCHEMA.md`):
+
+| Threat | Mitigation |
+|---|---|
+| App death (Obsidian shuts down) | All notes pass MVR; neovim distribution present |
+| Plugin death (Dataview/Tasks/Excalidraw abandoned) | Static snapshots; SVG exports alongside `.excalidraw.md` |
+| Format death (`.canvas`/`.base` schema change) | Companion `.md` for every Tier-2 artifact |
+
+### Required vault files
+
+```
+VAULT_INDEX.md       — editor-agnostic entry point
+VAULT_SCHEMA.md      — frontmatter allowlist, folder rules, threat model
+VAULT_MANIFEST.json  — machine-readable spec version, workflow continuity map
+EJECT.md             — ejection runbook (3 options + degraded features list)
+neovim/              — pinned plugins, config, setup guide
+Templates/plain/     — Obsidian template parity in plain text
+scripts/             — smoke-test.sh, link-integrity.sh, snapshot.py, ejectability-check.py
+```
+
+### Compliance checklist
+
+- Every Tier-1 note readable as plain Markdown
+- Every Tier-2 artifact has a Tier-1 fallback
+- No Tier-3 artifact is sole source of structure or knowledge
+- Bundle validated: `scripts/smoke-test.sh && scripts/link-integrity.sh` exit 0
+- neovim distribution reproducible on a fresh machine
+- Every workflow has a declared fallback or is marked degraded
+- Notes move Obsidian ↔ neovim without repair
+- Portability debt visible via `ejectability-check.py`
+
+**Minimum neovim stack:** `obsidian.nvim` + `markdown-oxide` (LSP backlinks) + Telescope + snippet support.
+
+### Implementation status
+
+**Compliant now:** Tier-1 plain markdown; inline-array YAML; near-PVS schema in templates.
+**Needs v3 work:** migrate `[[wikilinks]]`; `okm audit` rule for undoc'd keys; hierarchical tag decision; query snapshot infra.
+
+### Open questions
+
+- Wikilink migration: one-shot script or `okm audit`-guided?
+- `#inline-tags`: Tier-1 or Tier-2?
+- `VAULT_SCHEMA.md` versioning/bump rule
+- Per-note PVS opt-out (`pvs: ignore`)?
+
+---
+
+## Performance policy
+
+Port slow Bash/Python utilities (fuzz harness, `okm audit`, large TODO scans) to Rust once patterns stabilize. **Mirror when:** >1s on typical vault, hot-loop, or iteration-bound. **Don't mirror:** one-off scripts, I/O-bound, or anything still under active design. v2 "Rust mirror" row tracks this; v0/v1 stay in Bash/Python.
 
 ---
 
 ## See Also
 
-- `roadmap.md` — full v0/v1/v2 roadmap, critique, and ship plan
-- `ai-instructions.md` — AI assistant rules
-- `_skills/README.md` — AI skills library
-- `scripts/README.md` — cron job documentation
-- `setup-km.sh` — canonical source for versions and defaults
+- [`ai-instructions.md`](ai-instructions.md) — AI assistant rules
+- [`_skills/README.md`](_skills/README.md) — AI skills library
+- [`scripts/README.md`](scripts/README.md) — cron job docs
+- [`setup-km.sh`](setup-km.sh) — canonical source for versions and defaults
