@@ -5,7 +5,7 @@ Thanks for your interest. This is a small offline-first vault tool, so contribut
 ## Getting set up
 
 ```bash
-git clone --recurse-submodules https://github.com/awsaavedra/knowledge-management.git
+git clone --recurse-submodules https://github.com/{your-handle}/knowledge-management.git
 cd knowledge-management
 
 bash setup-km.sh        # idempotent — installs deps and Python venv
