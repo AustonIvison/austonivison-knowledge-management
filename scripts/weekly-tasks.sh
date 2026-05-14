@@ -36,7 +36,7 @@ if [ -z "${OBSIDIAN_VAULT:-}" ]; then
 else
     VAULT_DIR="${OBSIDIAN_VAULT}"
 fi
-TEMPLATE="${PROJECT_DIR}/inbox/weekly-template.md"
+TEMPLATE="${PROJECT_DIR}/public/inbox/weekly-template.md"
 
 TODAY="$(date +%F)"
 DOW="$(date +%u)"  # 1=Monday, 7=Sunday
@@ -46,7 +46,7 @@ DAY_NAME="$(date +%A)"
 WEEK_START="$(date -d "${TODAY} -$((DOW - 1)) days" +%F)"
 WEEK_END="$(date -d "${TODAY} +$((7 - DOW)) days" +%F)"
 
-OUTPUT_FILE="${PROJECT_DIR}/inbox/weekly-${WEEK_START}-to-${WEEK_END}.md"
+OUTPUT_FILE="${PROJECT_DIR}/public/inbox/weekly-${WEEK_START}-to-${WEEK_END}.md"
 
 WRITE_FILE=false
 if [[ "${1:-}" == "--output" ]]; then
@@ -119,7 +119,7 @@ get_prev_week_file() {
     local prev_monday prev_sunday prev_file
     prev_monday="$(date -d "${WEEK_START} -7 days" +%F)"
     prev_sunday="$(date -d "${WEEK_END} -7 days" +%F)"
-    prev_file="${PROJECT_DIR}/inbox/weekly-${prev_monday}-to-${prev_sunday}.md"
+    prev_file="${PROJECT_DIR}/public/inbox/weekly-${prev_monday}-to-${prev_sunday}.md"
     if [[ -f "$prev_file" ]]; then
         echo "$prev_file"
     fi

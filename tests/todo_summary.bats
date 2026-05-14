@@ -13,7 +13,7 @@ setup() {
     cp "${PROJECT_ROOT}/scripts/todo-summary.sh" "${TEST_TEMP_DIR}/todo-summary.sh"
     sed -i "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"${TEST_TEMP_DIR}\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
     sed -i "s|^PROJECT_DIR=.*|PROJECT_DIR=\"${FAKE_PROJECT_DIR}\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
-    sed -i "s|^OUTPUT_FILE=.*|OUTPUT_FILE=\"${FAKE_PROJECT_DIR}/inbox/todo-summary-\${YEAR}.md\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
+    sed -i "s|^OUTPUT_FILE=.*|OUTPUT_FILE=\"${FAKE_PROJECT_DIR}/public/inbox/todo-summary-\${YEAR}.md\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
     chmod +x "${TEST_TEMP_DIR}/todo-summary.sh"
 }
@@ -92,7 +92,7 @@ run_scanner() {
 }
 
 @test "TODO marker in vault .md file appears in Projects section" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 title: test
 ---
 TODO: research quantum computing"
@@ -116,7 +116,7 @@ TODO: research quantum computing"
 }
 
 @test "REVIEW marker in vault .md appears in Resources section" {
-    create_vault_file "inbox/reading.md" "REVIEW: read the Zettelkasten paper"
+    create_vault_file "public/inbox/reading.md" "REVIEW: read the Zettelkasten paper"
     run_scanner
     assert_success
     local section
@@ -127,7 +127,7 @@ TODO: research quantum computing"
 # === Areas Section (unchecked tasks) ===
 
 @test "unchecked task in .md appears in Areas section" {
-    create_vault_file "daily/2026-04-10.md" "---
+    create_vault_file "public/daily/2026-04-10.md" "---
 date: 2026-04-10
 ---
 - [ ] water the plants"
@@ -139,7 +139,7 @@ date: 2026-04-10
 }
 
 @test "checked tasks are NOT collected" {
-    create_vault_file "daily/done.md" "- [x] completed task
+    create_vault_file "public/daily/done.md" "- [x] completed task
 - [X] also done"
     run_scanner
     assert_success
@@ -150,7 +150,7 @@ date: 2026-04-10
 # === Cross-section and cross-directory ===
 
 @test "multiple markers in same file land in correct sections" {
-    create_vault_file "inbox/mixed.md" "TODO: project item
+    create_vault_file "public/inbox/mixed.md" "TODO: project item
 REVIEW: resource item
 - [ ] area item"
     run_scanner
@@ -166,7 +166,7 @@ REVIEW: resource item
 
 @test "markers from both project dir AND vault dir are collected" {
     create_project_file "build.sh" "# TODO: fix build step"
-    create_vault_file "inbox/tasks.md" "- [ ] review notes"
+    create_vault_file "public/inbox/tasks.md" "- [ ] review notes"
     run_scanner
     assert_success
     assert_output --partial "fix build step"
@@ -183,7 +183,7 @@ REVIEW: resource item
 }
 
 @test "inbox/todo-summary-*.md files are excluded from scan" {
-    create_project_file "inbox/todo-summary-2026.md" "TODO: old item from previous scan"
+    create_project_file "public/inbox/todo-summary-2026.md" "TODO: old item from previous scan"
     run_scanner
     assert_success
     refute_output --partial "old item from previous scan"
@@ -243,7 +243,7 @@ REVIEW: resource item
     create_project_file "job.sh" "# TODO: test output mode"
     run_scanner --output
     assert_success
-    [ -f "${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md" ]
+    [ -f "${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md" ]
 }
 
 @test "--output flag prints path to stdout" {
@@ -255,28 +255,28 @@ REVIEW: resource item
 @test "--output file contains frontmatter with todo-summary tag" {
     run_scanner --output
     assert_success
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     grep -q 'tags: \[todo-summary, para, automated\]' "$file"
 }
 
 @test "--output file contains year in frontmatter" {
     run_scanner --output
     assert_success
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     grep -q "year: $(date +%Y)" "$file"
 }
 
 @test "--output file contains TODO Summary title" {
     run_scanner --output
     assert_success
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     grep -q "# TODO Summary — $(date +%Y)" "$file"
 }
 
 @test "--output file contains Archive section at the bottom" {
     run_scanner --output
     assert_success
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     grep -q "## Archive" "$file"
     # Archive should be after all day sections
     local archive_line day_lines
@@ -289,7 +289,7 @@ REVIEW: resource item
     create_project_file "job.sh" "# TODO: para output test"
     run_scanner --output
     assert_success
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     grep -q "^### $(date +%F)$" "$file"
     grep -q "#### Projects" "$file"
     grep -q "#### Areas" "$file"
@@ -298,10 +298,10 @@ REVIEW: resource item
 
 @test "--output day section contains scanned items" {
     create_project_file "job.sh" "# TODO: output item test"
-    create_vault_file "inbox/tasks.md" "- [ ] vault output test"
+    create_vault_file "public/inbox/tasks.md" "- [ ] vault output test"
     run_scanner --output
     assert_success
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     grep -q "output item test" "$file"
     grep -q "vault output test" "$file"
 }
@@ -311,7 +311,7 @@ REVIEW: resource item
 @test "same-day re-run replaces today's section (not duplicates)" {
     create_project_file "first.sh" "# TODO: first run item"
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
 
     create_project_file "second.sh" "# TODO: second run item"
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
@@ -330,7 +330,7 @@ REVIEW: resource item
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     local count
-    count=$(find "${FAKE_PROJECT_DIR}/inbox" -name 'todo-summary-*.md' | wc -l)
+    count=$(find "${FAKE_PROJECT_DIR}/public/inbox" -name 'todo-summary-*.md' | wc -l)
     [ "$count" -eq 1 ]
 }
 
@@ -338,7 +338,7 @@ REVIEW: resource item
 
 @test "unchecked items from previous day carry forward to new day" {
     # Simulate a previous day's section already in the file
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     mkdir -p "$(dirname "$file")"
     cat > "$file" << 'FILEEOF'
 ---
@@ -400,7 +400,7 @@ FILEEOF
 }
 
 @test "checked items stay in their original day section" {
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     mkdir -p "$(dirname "$file")"
     cat > "$file" << 'FILEEOF'
 ---
@@ -452,7 +452,7 @@ FILEEOF
 
 @test "user-added notes in Archive are preserved across scans" {
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
 
     sed -i '/^## Archive/a\- [x] Finished the deploy — went smoothly' "$file"
     grep -q "Finished the deploy" "$file"
@@ -466,7 +466,7 @@ FILEEOF
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
 
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     local title_count
     title_count=$(grep -c "^# TODO Summary" "$file")
     [ "$title_count" -eq 1 ]
@@ -476,7 +476,7 @@ FILEEOF
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
 
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     local archive_count
     archive_count=$(grep -c "## Archive" "$file")
     [ "$archive_count" -eq 1 ]
@@ -485,7 +485,7 @@ FILEEOF
 # === Title context ===
 
 @test "md file with YAML title shows title in output" {
-    create_vault_file "inbox/my-research.md" "---
+    create_vault_file "public/inbox/my-research.md" "---
 title: Quantum Computing Notes
 created: 2026-04-10
 tags: []
@@ -498,7 +498,7 @@ TODO: read Shor's algorithm paper"
 }
 
 @test "md file with heading (no frontmatter) shows heading as title" {
-    create_vault_file "inbox/quick-note.md" "# Weekend Project Ideas
+    create_vault_file "public/inbox/quick-note.md" "# Weekend Project Ideas
 
 TODO: build a weather station"
     run_scanner
@@ -507,7 +507,7 @@ TODO: build a weather station"
 }
 
 @test "md file with no title or heading shows filename stem" {
-    create_vault_file "inbox/untitled.md" "TODO: orphan item with no title"
+    create_vault_file "public/inbox/untitled.md" "TODO: orphan item with no title"
     run_scanner
     assert_success
     assert_output --partial "**untitled**"
@@ -521,7 +521,7 @@ TODO: build a weather station"
 }
 
 @test "title is shown alongside file:line reference" {
-    create_vault_file "daily/2026-04-10.md" "---
+    create_vault_file "public/daily/2026-04-10.md" "---
 date: 2026-04-10
 tags: [daily]
 ---
@@ -539,7 +539,7 @@ tags: [daily]
 }
 
 @test "unchecked task text does not double up the checkbox prefix" {
-    create_vault_file "inbox/tasks.md" "---
+    create_vault_file "public/inbox/tasks.md" "---
 title: Sprint Tasks
 ---
 - [ ] deploy to staging"
@@ -591,14 +591,14 @@ TODO: this is a real todo item"
 }
 
 @test "files with spaces in names are handled" {
-    create_vault_file "inbox/my important notes.md" "- [ ] task in spaced filename"
+    create_vault_file "public/inbox/my important notes.md" "- [ ] task in spaced filename"
     run_scanner
     assert_success
     assert_output --partial "task in spaced filename"
 }
 
 @test "indented unchecked tasks are found" {
-    create_vault_file "inbox/indented.md" "  - [ ] indented task
+    create_vault_file "public/inbox/indented.md" "  - [ ] indented task
     - [ ] deeply indented task"
     run_scanner
     assert_success
@@ -611,6 +611,6 @@ TODO: this is a real todo item"
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     local count
-    count=$(find "${FAKE_PROJECT_DIR}/inbox" -name 'todo-summary-*.md' | wc -l)
+    count=$(find "${FAKE_PROJECT_DIR}/public/inbox" -name 'todo-summary-*.md' | wc -l)
     [ "$count" -eq 1 ]
 }

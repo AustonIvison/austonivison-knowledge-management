@@ -90,11 +90,11 @@ km_check_remote_is_private() {
 km_is_note_path() {
     local path="$1"
     case "$path" in
-        daily/*.md)   return 0 ;;
-        archive/*.md) return 0 ;;
-        inbox/*.md)
+        public/daily/*.md)   return 0 ;;
+        public/archive/*.md) return 0 ;;
+        public/inbox/*.md)
             case "$path" in
-                inbox/templates/*) return 1 ;;
+                public/inbox/templates/*) return 1 ;;
                 *) return 0 ;;
             esac
             ;;

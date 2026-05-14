@@ -16,8 +16,8 @@ setup() {
     common_setup
     OKM="${PROJECT_ROOT}/bin/okm"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
-    export OBSIDIAN_DAILY_DIR="daily"
-    export OBSIDIAN_NOTES_DIR="inbox"
+    export OBSIDIAN_DAILY_DIR="public/daily"
+    export OBSIDIAN_NOTES_DIR="public/inbox"
     export EDITOR="true"
 }
 
@@ -38,14 +38,14 @@ setup() {
 
 @test "B3: okm tags reads block-style tag list" {
     skip "v1: block-style YAML read not yet implemented"
-    create_vault_file "inbox/block.md" "---
+    create_vault_file "public/inbox/block.md" "---
 title: Block Tags
 tags:
   - foo
   - bar
 ---
 body"
-    run "${OKM}" tags inbox/block.md
+    run "${OKM}" tags public/inbox/block.md
     assert_success
     assert_output --partial "foo"
     assert_output --partial "bar"
@@ -53,7 +53,7 @@ body"
 
 @test "B3: okm tagged finds note with block-style tags" {
     skip "v1: block-style YAML read not yet implemented"
-    create_vault_file "inbox/block.md" "---
+    create_vault_file "public/inbox/block.md" "---
 title: Block Tags
 tags:
   - findme
@@ -66,15 +66,15 @@ body"
 
 @test "B3: okm tag appends to block-style tags without corrupting frontmatter" {
     skip "v1: block-style YAML read not yet implemented"
-    create_vault_file "inbox/block.md" "---
+    create_vault_file "public/inbox/block.md" "---
 title: Block Tags
 tags:
   - existing
 ---
 body"
-    run "${OKM}" tag inbox/block.md newtag
+    run "${OKM}" tag public/inbox/block.md newtag
     assert_success
-    run "${OKM}" tags inbox/block.md
+    run "${OKM}" tags public/inbox/block.md
     assert_output --partial "existing"
     assert_output --partial "newtag"
 }
@@ -94,24 +94,24 @@ body"
 
 @test "N30: okm tag errors on note with lone --- (not real frontmatter)" {
     skip "v1: has_frontmatter HR false positive not yet fixed"
-    create_vault_file "inbox/hr.md" "---
+    create_vault_file "public/inbox/hr.md" "---
 This is just a horizontal rule, no closing delimiter
 body content here"
-    run "${OKM}" tag inbox/hr.md sometag
+    run "${OKM}" tag public/inbox/hr.md sometag
     assert_failure
     assert_output --partial "frontmatter"
 }
 
 @test "N30: okm tag succeeds on note with valid opening and closing ---" {
     skip "v1: has_frontmatter HR false positive not yet fixed"
-    create_vault_file "inbox/valid.md" "---
+    create_vault_file "public/inbox/valid.md" "---
 title: Valid
 tags: []
 ---
 body"
-    run "${OKM}" tag inbox/valid.md sometag
+    run "${OKM}" tag public/inbox/valid.md sometag
     assert_success
-    run "${OKM}" tags inbox/valid.md
+    run "${OKM}" tags public/inbox/valid.md
     assert_output --partial "sometag"
 }
 
@@ -130,31 +130,31 @@ body"
 
 @test "N31: okm tag preserves 644 permissions after write" {
     skip "v1: write_tags_line permissions clobber not yet fixed"
-    create_vault_file "inbox/perms.md" "---
+    create_vault_file "public/inbox/perms.md" "---
 title: Perms
 tags: []
 ---
 body"
-    chmod 644 "${FAKE_VAULT_DIR}/inbox/perms.md"
-    run "${OKM}" tag inbox/perms.md footag
+    chmod 644 "${FAKE_VAULT_DIR}/public/inbox/perms.md"
+    run "${OKM}" tag public/inbox/perms.md footag
     assert_success
     local perms
-    perms=$(stat -c '%a' "${FAKE_VAULT_DIR}/inbox/perms.md")
+    perms=$(stat -c '%a' "${FAKE_VAULT_DIR}/public/inbox/perms.md")
     [ "$perms" = "644" ]
 }
 
 @test "N31: okm untag preserves 664 permissions after write" {
     skip "v1: write_tags_line permissions clobber not yet fixed"
-    create_vault_file "inbox/perms2.md" "---
+    create_vault_file "public/inbox/perms2.md" "---
 title: Perms2
 tags: [keeptag]
 ---
 body"
-    chmod 664 "${FAKE_VAULT_DIR}/inbox/perms2.md"
-    run "${OKM}" untag inbox/perms2.md keeptag
+    chmod 664 "${FAKE_VAULT_DIR}/public/inbox/perms2.md"
+    run "${OKM}" untag public/inbox/perms2.md keeptag
     assert_success
     local perms
-    perms=$(stat -c '%a' "${FAKE_VAULT_DIR}/inbox/perms2.md")
+    perms=$(stat -c '%a' "${FAKE_VAULT_DIR}/public/inbox/perms2.md")
     [ "$perms" = "664" ]
 }
 
@@ -174,7 +174,7 @@ body"
     # Simulate a note already written with a URL containing )
     # The fix must be in the template substitution in bin/okm spot handler.
     # Verify the generated note parses as valid markdown (link has matching parens).
-    create_vault_file "inbox/spot-paren.md" "---
+    create_vault_file "public/inbox/spot-paren.md" "---
 title: Track With Paren
 tags: [source/spotify]
 ---
@@ -182,7 +182,7 @@ tags: [source/spotify]
     # A markdown parser reading this must see one complete link, not two fragments.
     # Acceptance: the url in the link does not contain a bare unescaped ).
     run grep -oP '\[Listen on Spotify\]\(<?\K[^)>]+' \
-        "${FAKE_VAULT_DIR}/inbox/spot-paren.md"
+        "${FAKE_VAULT_DIR}/public/inbox/spot-paren.md"
     refute_output --partial ")"
 }
 
@@ -228,7 +228,7 @@ tags: [source/spotify]
     # With KM_TRACK_NOTES defaulting to true, the new note should be git-added
     local status
     status=$(git -C "${FAKE_VAULT_DIR}" status --porcelain)
-    [[ "$status" == *"inbox/"* ]]
+    [[ "$status" == *"public/inbox/"* ]]
 }
 
 @test "F6: okm today with KM_TRACK_NOTES unset behaves same as KM_TRACK_NOTES=true" {
@@ -241,7 +241,7 @@ tags: [source/spotify]
     assert_success
     local status
     status=$(git -C "${FAKE_VAULT_DIR}" status --porcelain)
-    [[ "$status" == *"daily/"* ]]
+    [[ "$status" == *"public/daily/"* ]]
 }
 
 # =============================================================================
@@ -278,7 +278,7 @@ tags: [source/spotify]
 @test "N6: verify-km warns when project dir equals vault dir" {
     skip "v1: dual-mode co-location warning not yet implemented"
     export OBSIDIAN_VAULT="${PROJECT_ROOT}"
-    run bash "${PROJECT_ROOT}/verify-km.sh"
+    run bash "${PROJECT_ROOT}/scripts/verify-km.sh"
     assert_output --partial "co-located"
 }
 
@@ -325,7 +325,7 @@ tags: [source/spotify]
     local orig_path="$PATH"
     export PATH="${TEST_TEMP_DIR}/empty_bin:${PATH}"
     mkdir -p "${TEST_TEMP_DIR}/empty_bin"
-    run bash "${PROJECT_ROOT}/verify-km.sh"
+    run bash "${PROJECT_ROOT}/scripts/verify-km.sh"
     # Should WARN, not FAIL (direnv is optional)
     assert_output --partial "direnv"
     export PATH="$orig_path"
@@ -351,7 +351,7 @@ tags: [source/spotify]
     git -C "${FAKE_VAULT_DIR}" init -q -b main
     git -C "${FAKE_VAULT_DIR}" config user.email "t@t"
     git -C "${FAKE_VAULT_DIR}" config user.name "t"
-    create_vault_file "inbox/note.md" "safe"
+    create_vault_file "public/inbox/note.md" "safe"
     git -C "${FAKE_VAULT_DIR}" add -A
     git -C "${FAKE_VAULT_DIR}" commit -q -m init
     create_vault_file ".env" "SECRET=hunter2"
@@ -365,7 +365,7 @@ tags: [source/spotify]
     git -C "${FAKE_VAULT_DIR}" init -q -b main
     git -C "${FAKE_VAULT_DIR}" config user.email "t@t"
     git -C "${FAKE_VAULT_DIR}" config user.name "t"
-    create_vault_file "inbox/note.md" "safe"
+    create_vault_file "public/inbox/note.md" "safe"
     git -C "${FAKE_VAULT_DIR}" add -A
     git -C "${FAKE_VAULT_DIR}" commit -q -m init
     create_vault_file ".env" "SECRET=hunter2"
@@ -391,7 +391,7 @@ tags: [source/spotify]
 
 @test "okm audit --json outputs valid JSON" {
     skip "v1: okm audit --json not yet implemented"
-    create_vault_file "inbox/clean.md" "---
+    create_vault_file "public/inbox/clean.md" "---
 title: Clean
 tags: [foo]
 ---
@@ -405,7 +405,7 @@ clean content"
 
 @test "okm audit --json includes secret findings" {
     skip "v1: okm audit --json not yet implemented"
-    create_vault_file "inbox/oops.md" "---
+    create_vault_file "public/inbox/oops.md" "---
 title: Oops
 ---
 AKIA1234567890EXAMPLE"
@@ -427,8 +427,8 @@ AKIA1234567890EXAMPLE"
 
 @test "okm rename-tag renames tag across all notes" {
     skip "v1: okm rename-tag not yet implemented"
-    create_vault_file "inbox/a.md" "---\ntitle: A\ntags: [oldtag]\n---"
-    create_vault_file "inbox/b.md" "---\ntitle: B\ntags: [oldtag, other]\n---"
+    create_vault_file "public/inbox/a.md" "---\ntitle: A\ntags: [oldtag]\n---"
+    create_vault_file "public/inbox/b.md" "---\ntitle: B\ntags: [oldtag, other]\n---"
     run "${OKM}" rename-tag oldtag newtag
     assert_success
     run "${OKM}" tagged oldtag
@@ -450,7 +450,7 @@ AKIA1234567890EXAMPLE"
     assert_success
     local today
     today=$(date +%Y-%m-%d)
-    run grep "tags:" "${FAKE_VAULT_DIR}/daily/${today}.md"
+    run grep "tags:" "${FAKE_VAULT_DIR}/public/daily/${today}.md"
     assert_output --partial "work"
     assert_output --partial "journal"
 }
@@ -463,8 +463,8 @@ AKIA1234567890EXAMPLE"
 
 @test "okm tags --json outputs valid JSON array" {
     skip "v1: okm tags --json not yet implemented"
-    create_vault_file "inbox/a.md" "---\ntitle: A\ntags: [foo, bar]\n---"
-    create_vault_file "inbox/b.md" "---\ntitle: B\ntags: [foo]\n---"
+    create_vault_file "public/inbox/a.md" "---\ntitle: A\ntags: [foo, bar]\n---"
+    create_vault_file "public/inbox/b.md" "---\ntitle: B\ntags: [foo]\n---"
     run "${OKM}" tags --json
     assert_success
     assert_output --partial '"tag"'
@@ -479,40 +479,40 @@ AKIA1234567890EXAMPLE"
 # by default. There is no write-side: no command puts notes INTO private-*.
 #
 # v1 design:
-#   okm private new <title>    → creates in private-inbox/
-#   okm private today          → creates/opens in private-daily/
-#   okm private capture [text] → creates in private-inbox/ (timestamped)
+#   okm private new <title>    → creates in private/inbox/
+#   okm private today          → creates/opens in private/daily/
+#   okm private capture [text] → creates in private/inbox/ (timestamped)
 #
 # Implementation: okm private dispatches to the same underlying functions
-# as new/today/capture but overrides OBSIDIAN_NOTES_DIR=private-inbox and
-# OBSIDIAN_DAILY_DIR=private-daily before calling them.
+# as new/today/capture but overrides OBSIDIAN_NOTES_DIR=private/inbox and
+# OBSIDIAN_DAILY_DIR=private/daily before calling them.
 # The private-* dirs must already exist (setup-km.sh creates them).
 
-@test "okm private new creates note in private-inbox" {
+@test "okm private new creates note in private/inbox" {
     skip "v1: okm private not yet implemented"
-    mkdir -p "${FAKE_VAULT_DIR}/private-inbox"
+    mkdir -p "${FAKE_VAULT_DIR}/private/inbox"
     run "${OKM}" private new "secret project"
     assert_success
     local slug="secret-project"
-    [ -f "${FAKE_VAULT_DIR}/private-inbox/${slug}.md" ]
+    [ -f "${FAKE_VAULT_DIR}/private/inbox/${slug}.md" ]
 }
 
-@test "okm private today creates daily note in private-daily" {
+@test "okm private today creates daily note in private/daily" {
     skip "v1: okm private not yet implemented"
-    mkdir -p "${FAKE_VAULT_DIR}/private-daily"
+    mkdir -p "${FAKE_VAULT_DIR}/private/daily"
     run "${OKM}" private today
     assert_success
     local today
     today=$(date +%Y-%m-%d)
-    [ -f "${FAKE_VAULT_DIR}/private-daily/${today}.md" ]
+    [ -f "${FAKE_VAULT_DIR}/private/daily/${today}.md" ]
 }
 
-@test "okm private capture adds note to private-inbox" {
+@test "okm private capture adds note to private/inbox" {
     skip "v1: okm private not yet implemented"
-    mkdir -p "${FAKE_VAULT_DIR}/private-inbox"
+    mkdir -p "${FAKE_VAULT_DIR}/private/inbox"
     run "${OKM}" private capture "secret thought"
     assert_success
-    run find "${FAKE_VAULT_DIR}/private-inbox" -name "*.md"
+    run find "${FAKE_VAULT_DIR}/private/inbox" -name "*.md"
     assert_output --partial ".md"
 }
 
@@ -661,7 +661,7 @@ HOOK
     git -C "${FAKE_VAULT_DIR}" init -q -b main
     git -C "${FAKE_VAULT_DIR}" config user.email "t@t"
     git -C "${FAKE_VAULT_DIR}" config user.name "t"
-    create_vault_file "inbox/uncommitted.md" "dirty"
+    create_vault_file "public/inbox/uncommitted.md" "dirty"
     run "${OKM}" port testhandle --no-push
     assert_failure
     assert_output --partial "clean"
@@ -675,7 +675,7 @@ HOOK
     git -C "${FAKE_VAULT_DIR}" config user.name "t"
     git -C "${FAKE_VAULT_DIR}" remote add origin \
         "https://github.com/upstream/knowledge-management.git"
-    create_vault_file "inbox/note.md" "body"
+    create_vault_file "public/inbox/note.md" "body"
     git -C "${FAKE_VAULT_DIR}" add -A
     git -C "${FAKE_VAULT_DIR}" commit -q -m init
     run "${OKM}" sync
@@ -692,10 +692,10 @@ HOOK
     git -C "${FAKE_VAULT_DIR}" init -q -b main
     git -C "${FAKE_VAULT_DIR}" config user.email "t@t"
     git -C "${FAKE_VAULT_DIR}" config user.name "t"
-    create_vault_file "inbox/note.md" "body"
+    create_vault_file "public/inbox/note.md" "body"
     git -C "${FAKE_VAULT_DIR}" add -A
     git -C "${FAKE_VAULT_DIR}" commit -q -m init
-    create_vault_file "inbox/note2.md" "body2"
+    create_vault_file "public/inbox/note2.md" "body2"
     run "${OKM}" sync -m "my custom message"
     assert_success
     run git -C "${FAKE_VAULT_DIR}" log --oneline -1
@@ -709,7 +709,7 @@ HOOK
     for i in $(seq 1 10); do
         touch "${HOME}/.local/log/setup-km-200${i}-01-01.log"
     done
-    run bash "${PROJECT_ROOT}/setup-km.sh" --dry-run 2>/dev/null || true
+    run bash "${PROJECT_ROOT}/scripts/setup-km.sh" --dry-run 2>/dev/null || true
     local count
     count=$(find "${HOME}/.local/log" -name "setup-km-*.log" | wc -l)
     [ "$count" -le 5 ]
@@ -726,7 +726,7 @@ HOOK
     # variable reference hits set -u and aborts with a cryptic message.
     # Fix: add *) log_error "Unsupported platform: ${PLATFORM_OS}/${PLATFORM_ARCH}"; return 1 ;;
     PLATFORM_OS=haiku PLATFORM_ARCH=riscv \
-        run bash -c 'source '"${PROJECT_ROOT}/setup-km.sh"'; install_nvim'
+        run bash -c 'source '"${PROJECT_ROOT}/scripts/setup-km.sh"'; install_nvim'
     assert_failure
     assert_output --partial "Unsupported"
 }
@@ -739,7 +739,7 @@ HOOK
     run "${OKM}" new $'Tab\there'
     assert_success
     local file
-    file="$(find "${FAKE_VAULT_DIR}/inbox" -name '*.md' | head -1)"
+    file="$(find "${FAKE_VAULT_DIR}/public/inbox" -name '*.md' | head -1)"
     run grep '^title:' "$file"
     # Must not contain a raw tab character
     refute_output --regexp $'title:.*\t'
@@ -763,17 +763,17 @@ HOOK
     skip "v1: || true on the find|stat pipeline silently swallows errors; user sees empty fzf with no explanation"
     # Fix: capture the exit status separately and emit a warning to stderr before
     # falling through to the empty-selection exit.
-    mkdir -p "${FAKE_VAULT_DIR}/inbox"
-    chmod 000 "${FAKE_VAULT_DIR}/inbox"
+    mkdir -p "${FAKE_VAULT_DIR}/public/inbox"
+    chmod 000 "${FAKE_VAULT_DIR}/public/inbox"
     run "${OKM}" recent
-    chmod 755 "${FAKE_VAULT_DIR}/inbox"
+    chmod 755 "${FAKE_VAULT_DIR}/public/inbox"
     assert_output --partial "warn"
 }
 
 @test "okm tagged warns when files with block-style tags are skipped" {
     skip "v1: list_tagged silently skips block-style-tag files; users get incomplete results with no notice"
     # Fix: count skipped files and emit a warning: "N note(s) with block-style tags skipped (v1)".
-    create_vault_file "inbox/block.md" "$(printf -- '---\ntags:\n  - foo\n---\nbody')"
+    create_vault_file "public/inbox/block.md" "$(printf -- '---\ntags:\n  - foo\n---\nbody')"
     run "${OKM}" tagged foo
     assert_output --partial "skipped"
 }

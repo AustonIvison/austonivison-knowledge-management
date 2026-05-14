@@ -21,7 +21,7 @@ Scans file types: `.md`, `.sh`, `.lua`, `.yml`, `.json`
 # Print summary to stdout
 bash scripts/todo-summary.sh
 
-# Write summary to inbox/todo-summary-YYYY.md (yearly living doc)
+# Write summary to public/inbox/todo-summary-YYYY.md (yearly living doc)
 bash scripts/todo-summary.sh --output
 ```
 
@@ -54,7 +54,7 @@ CronCreate: "3 15 * * *" — PARA TODO scan, 15:00 daily
 
 ### Output
 
-Each year gets a single file `inbox/todo-summary-YYYY.md`. Each cron run prepends a timestamped scan section (newest at top). Checked-off items stay as accomplishment records. The file uses PARA structure:
+Each year gets a single file `public/inbox/todo-summary-YYYY.md`. Each cron run prepends a timestamped scan section (newest at top). Checked-off items stay as accomplishment records. The file uses PARA structure:
 
 ```
 ## Projects    — TODO/FIXME/HACK/XXX markers
@@ -71,7 +71,7 @@ Weekly PARA-structured scanner. Same markers as `todo-summary.sh` but outputs to
 
 ### Output
 
-Each week gets its own file: `inbox/weekly-YYYY-MM-DD-to-YYYY-MM-DD.md` (Monday to Sunday). Uses `inbox/weekly-template.md` for new files.
+Each week gets its own file: `public/inbox/weekly-YYYY-MM-DD-to-YYYY-MM-DD.md` (Monday to Sunday). Uses `public/inbox/weekly-template.md` for new files.
 
 - One section per day (`### YYYY-MM-DD Weekday`), newest at top
 - Same-day re-runs replace that day's section
@@ -85,7 +85,7 @@ Each week gets its own file: `inbox/weekly-YYYY-MM-DD-to-YYYY-MM-DD.md` (Monday 
 # Print summary to stdout
 bash scripts/weekly-tasks.sh
 
-# Write summary to inbox/weekly-YYYY-MM-DD-to-YYYY-MM-DD.md
+# Write summary to public/inbox/weekly-YYYY-MM-DD-to-YYYY-MM-DD.md
 bash scripts/weekly-tasks.sh --output
 ```
 
@@ -105,12 +105,12 @@ Runs daily at **07:00**, **12:00**, and **15:00**.
 
 ## compress-images.py
 
-Converts PNG, JPG, JPEG, and static GIF images in `attachments/` to WebP. Updates `![[wikilinks]]` in vault notes so Obsidian embeds don't break. Animated GIFs are skipped.
+Converts PNG, JPG, JPEG, and static GIF images in `public/attachments/` to WebP. Updates `![[wikilinks]]` in vault notes so Obsidian embeds don't break. Animated GIFs are skipped.
 
 ### Usage
 
 ```bash
-# Convert all images in attachments/
+# Convert all images in public/attachments/
 python3 scripts/compress-images.py
 
 # Preview what would change (no writes)

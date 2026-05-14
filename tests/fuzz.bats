@@ -13,10 +13,10 @@ setup() {
     common_setup
     OKM="${PROJECT_ROOT}/bin/okm"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
-    export OBSIDIAN_DAILY_DIR="daily"
-    export OBSIDIAN_NOTES_DIR="inbox"
+    export OBSIDIAN_DAILY_DIR="public/daily"
+    export OBSIDIAN_NOTES_DIR="public/inbox"
     export EDITOR="true"
-    mkdir -p "${FAKE_VAULT_DIR}/inbox" "${FAKE_VAULT_DIR}/daily"
+    mkdir -p "${FAKE_VAULT_DIR}/public/inbox" "${FAKE_VAULT_DIR}/public/daily"
 }
 
 # Helper: assert no files were created outside the vault.
@@ -50,7 +50,7 @@ assert_no_escape() {
 @test "fuzz: okm new with slashes in title" {
     run "${OKM}" new "foo/bar/baz"
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/foo-bar-baz.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/foo-bar-baz.md"
     [ -f "$file" ]
     assert_no_escape
 }
@@ -70,7 +70,7 @@ assert_no_escape() {
 @test "fuzz: okm new with double quotes" {
     run "${OKM}" new 'She said "hello"'
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/she-said-hello.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/she-said-hello.md"
     [ -f "$file" ]
     grep -q 'title: "She said \\"hello\\""' "$file"
 }
@@ -78,7 +78,7 @@ assert_no_escape() {
 @test "fuzz: okm new with backslash-n in title (YAML escape sequence)" {
     run "${OKM}" new 'test\note'
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/test-note.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/test-note.md"
     [ -f "$file" ]
     grep -q 'title: "test\\\\note"' "$file"
 }
@@ -87,7 +87,7 @@ assert_no_escape() {
     run "${OKM}" new "Safe Title" -t 'ok,evil]'
     assert_failure
     assert_output --partial "Invalid tag"
-    [ ! -f "${FAKE_VAULT_DIR}/inbox/safe-title.md" ]
+    [ ! -f "${FAKE_VAULT_DIR}/public/inbox/safe-title.md" ]
 }
 
 @test "fuzz: okm new with 250 char title (near filesystem limit)" {
@@ -113,67 +113,67 @@ assert_no_escape() {
 # === okm tag — tag fuzzing ===
 
 @test "fuzz: okm tag with empty tag" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md" ""
+    run "${OKM}" tag "public/inbox/note.md" ""
     assert_failure
     assert_output --partial "Invalid tag"
 }
 
 @test "fuzz: okm tag with space in tag" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md" "two words"
+    run "${OKM}" tag "public/inbox/note.md" "two words"
     assert_failure
 }
 
 @test "fuzz: okm tag with YAML-breaking chars" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
     for bad_tag in 'evil]' 'evil[' 'foo:bar' 'a,b' 'a"b' 'a|b'; do
-        run "${OKM}" tag "inbox/note.md" "$bad_tag"
+        run "${OKM}" tag "public/inbox/note.md" "$bad_tag"
         assert_failure
     done
 }
 
 @test "fuzz: okm tag with very long tag name (500 chars)" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
     local long_tag
     long_tag="$(python3 -c 'print("a" * 500)')"
-    run "${OKM}" tag "inbox/note.md" "$long_tag"
+    run "${OKM}" tag "public/inbox/note.md" "$long_tag"
     assert_success
-    grep -q "tags:" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "tags:" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 @test "fuzz: okm tag with tag starting with dash" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md" "-starts-with-dash"
+    run "${OKM}" tag "public/inbox/note.md" "-starts-with-dash"
     assert_success
     refute_output --partial "grep:"
 }
 
 @test "fuzz: okm tag idempotent — adding same tag twice" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: [foo]
 ---"
-    run "${OKM}" tag "inbox/note.md" "foo"
+    run "${OKM}" tag "public/inbox/note.md" "foo"
     assert_success
     local count
-    count="$(grep -o 'foo' "${FAKE_VAULT_DIR}/inbox/note.md" | grep -c . || true)"
+    count="$(grep -o 'foo' "${FAKE_VAULT_DIR}/public/inbox/note.md" | grep -c . || true)"
     [ "$count" -eq 1 ]
 }
 
 # === okm tagged — query fuzzing ===
 
 @test "fuzz: okm tagged with regex metacharacters" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: [safe]
 ---"
     for bad in '.*' 'foo|bar' '(group)' '[class]' 'star*' 'plus+question?'; do
@@ -235,7 +235,7 @@ tags: [safe]
 # === okm grep — pattern fuzzing ===
 
 @test "fuzz: okm grep with regex special chars doesn't crash" {
-    echo "test" > "${FAKE_VAULT_DIR}/inbox/x.md"
+    echo "test" > "${FAKE_VAULT_DIR}/public/inbox/x.md"
     run "${OKM}" grep '(unclosed'
     # rg treats this as an error; that's fine — just no crash
     [ "$status" -le 2 ]
@@ -249,14 +249,14 @@ tags: [safe]
 # === okm files — pattern fuzzing ===
 
 @test "fuzz: okm files with glob characters returns gracefully" {
-    echo "test" > "${FAKE_VAULT_DIR}/inbox/readme.md"
+    echo "test" > "${FAKE_VAULT_DIR}/public/inbox/readme.md"
     run "${OKM}" files "*.md"
     # Substring match: * is literal, so no results — graceful empty
     assert_success
 }
 
 @test "fuzz: okm files with empty vault returns empty" {
-    rm -rf "${FAKE_VAULT_DIR}/inbox/"*.md "${FAKE_VAULT_DIR}/daily/"*.md
+    rm -rf "${FAKE_VAULT_DIR}/public/inbox/"*.md "${FAKE_VAULT_DIR}/public/daily/"*.md
     run "${OKM}" files
     assert_success
 }
@@ -267,7 +267,7 @@ tags: [safe]
     run "${OKM}" new $'Title With\nNewline'
     assert_success
     local file
-    file="$(find "${FAKE_VAULT_DIR}/inbox" -name '*.md' | head -1)"
+    file="$(find "${FAKE_VAULT_DIR}/public/inbox" -name '*.md' | head -1)"
     [ -f "$file" ]
     run grep '^title:' "$file"
     assert_output --regexp '^title: "Title With Newline"'

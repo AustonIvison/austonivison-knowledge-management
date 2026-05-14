@@ -8,9 +8,9 @@ Thanks for your interest. This is a small offline-first vault tool, so contribut
 git clone --recurse-submodules https://github.com/{your-handle}/knowledge-management.git
 cd knowledge-management
 
-bash setup-km.sh        # idempotent — installs deps and Python venv
-source env.sh            # activate project environment
-bash verify-km.sh       # confirm install
+bash scripts/setup-km.sh   # idempotent — installs deps and Python venv
+source env.sh               # activate project environment
+bash scripts/verify-km.sh  # confirm install
 ```
 
 `tests/lib/` contains BATS submodules. If you cloned without `--recurse-submodules`, run `git submodule update --init --recursive` before running the test suite.
@@ -32,7 +32,7 @@ Tests stub `EDITOR=true` and use a temporary `OBSIDIAN_VAULT`, so they don't tou
 - If you add or rename an `okm` subcommand, update the table in `README.md`.
 - If you add a new env var, document it in the `env.sh` table in `README.md`.
 - Add or update a `.bats` test for any behavioural change. CI (`.github/workflows/test.yml`) runs the full suite on every PR.
-- Don't commit notes — `.gitignore` excludes `inbox/*.md` (templates excepted), `daily/*.md`, and `archive/*.md` for a reason.
+- Don't commit notes — `.gitignore` excludes `public/inbox/*.md` (templates excepted), `public/daily/*.md`, and `public/archive/*.md` for a reason.
 
 ## Reporting issues
 

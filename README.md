@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> **Disclaimer:** Content in this vault (financial, health, investment topics) is for educational purposes only. See [`disclaimer.md`](disclaimer.md).
+> **Disclaimer:** Content in this vault (financial, health, investment topics) is for educational purposes only. See [`docs/disclaimer.md`](docs/disclaimer.md).
 
 Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI — file-native, offline-first, continuously tested. Treats notes like code: plain Markdown, local files, terminal workflows, composable CLI. AI is optional and layered on top.
 
@@ -34,7 +34,7 @@ Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI
 git clone --recurse-submodules <your-fork-url> ~/projects/knowledge-management
 cd ~/projects/knowledge-management
 export OBSIDIAN_VAULT="$HOME/my-vault"   # optional; default: sibling dir
-bash setup-km.sh && source env.sh && bash verify-km.sh
+bash scripts/setup-km.sh && source env.sh && bash scripts/verify-km.sh
 bash tests/run_all.sh
 ```
 
@@ -51,18 +51,18 @@ bash scripts/seed-demo.sh --teardown   # clean up
 ```
 
 **Obsidian:** `okm obs` → open `$(okm path)` as vault on first launch.
-**Neovim:** `nvim daily/demo-$(date +%Y-%m-%d).md` — expect green `PUBLIC PARA · daily` winbar, TODO/FIXME/BUG highlights, `<leader>od/on/os/oo/ob` keymaps. If missing: `NVIM_APPNAME=km nvim --headless "+Lazy! sync" +qa`.
-**Vim:** `EDITOR=vim okm open inbox/demo-meeting-notes.md` — expect green `PUBLIC PARA · inbox` statusline. (`bin/vim` wraps `vim -u config/vim/vimrc`; `bin/` is first on `$PATH` via `env.sh` so `vim` loads project config without touching `~/.vimrc`; wrapper used instead of `$VIMINIT` because nvim also honors it.)
-**Private side test:** `nvim private-inbox/demo-private.md` → red `⚠ PRIVATE PARA` banner.
+**Neovim:** `nvim public/daily/demo-$(date +%Y-%m-%d).md` — expect green `PUBLIC PARA · daily` winbar, TODO/FIXME/BUG highlights, `<leader>od/on/os/oo/ob` keymaps. If missing: `NVIM_APPNAME=km nvim --headless "+Lazy! sync" +qa`.
+**Vim:** `EDITOR=vim okm open public/inbox/demo-meeting-notes.md` — expect green `PUBLIC PARA · inbox` statusline. (`bin/vim` wraps `vim -u config/vim/vimrc`; `bin/` is first on `$PATH` via `env.sh` so `vim` loads project config without touching `~/.vimrc`; wrapper used instead of `$VIMINIT` because nvim also honors it.)
+**Private side test:** `nvim private/inbox/demo-private.md` → red `⚠ PRIVATE PARA` banner.
 
 Seeded files:
 
 | Folder | Files |
 |---|---|
-| `daily/` | `demo-YYYY-MM-DD.md` |
-| `inbox/` | `demo-meeting-notes.md`, `demo-capture.md`, `demo-yt-example.md`, `demo-spotify-episode.md`, `demo-spotify-track.md`, `demo-podcast.md`, `demo-todo-summary-YYYY.md`, `demo-weekly-*.md` |
-| `attachments/` | `demo-screenshot.png` (1×1 placeholder) |
-| `archive/` | `demo-completed-project.md` |
+| `public/daily/` | `demo-YYYY-MM-DD.md` |
+| `public/inbox/` | `demo-meeting-notes.md`, `demo-capture.md`, `demo-yt-example.md`, `demo-spotify-episode.md`, `demo-spotify-track.md`, `demo-podcast.md`, `demo-todo-summary-YYYY.md`, `demo-weekly-*.md` |
+| `public/attachments/` | `demo-screenshot.png` (1×1 placeholder) |
+| `public/archive/` | `demo-completed-project.md` |
 
 ---
 
@@ -87,37 +87,55 @@ Seeded files:
 
 ```
 .
-├── env.sh / setup-km.sh / verify-km.sh
-├── ai-instructions.md
+├── env.sh
 ├── bin/okm                         # vault CLI
 ├── config/nvim/                    # NVIM_APPNAME=km → ~/.config/km/
 ├── config/lazygit/ / config/mpv/
+├── docs/ai-instructions.md         # AI assistant rules
+├── docs/skills/                    # AI skills library
+│   ├── README.md
+│   ├── argumentation.md
+│   ├── code-review.md
+│   ├── debug.md
+│   ├── delegation.md
+│   ├── diagnostic.md
+│   ├── distill-prompt.md
+│   ├── research.md
+│   ├── security.md
+│   ├── software-engineering.md
+│   └── transcripts.md
+├── scripts/setup-km.sh             # install and configure
+├── scripts/verify-km.sh            # post-install checks
 ├── scripts/todo-summary.sh         # PARA TODO scanner (cron)
 ├── scripts/weekly-tasks.sh         # weekly summary (cron)
 ├── scripts/compress-images.py      # PNG/JPG → WebP (cron)
 ├── tests/                          # BATS suite
-├── _skills/                        # AI skills library
 └── venv/                           # Python venv (gitignored)
 
 ../knowledge-management/            # vault (override: $OBSIDIAN_VAULT)
-├── daily/          # Areas — one file per day
-├── inbox/          # Projects — active notes and captures
-├── attachments/    # Resources — images, PDFs
-├── archive/        # Archive — completed notes
-└── private-*/      # Mirror of above; AI-private
+├── public/
+│   ├── daily/       # Areas — one file per day
+│   ├── inbox/       # Projects — active notes and captures
+│   ├── attachments/ # Resources — images, PDFs
+│   └── archive/     # Archive — completed notes
+└── private/         # Mirror of public/; AI-private; local-only
+    ├── daily/
+    ├── inbox/
+    ├── attachments/
+    └── archive/
 ```
 
-Vault follows [PARA](https://fortelabs.com/blog/para/). `private-{daily,inbox,attachments,archive}/` mirror each public folder.
+Vault follows [PARA](https://fortelabs.com/blog/para/). `private/{daily,inbox,attachments,archive}/` mirror each public folder.
 
 ---
 
 ## Rules
 
 - **Fork before sharing.** Work in your fork; `okm sync` pushes to whatever `origin` points at.
-- **`private-*/` is local-only by default.** Excluded from git regardless of `KM_TRACK_NOTES`. Opt in with git-crypt.
+- **`private/` is local-only by default.** Excluded from git regardless of `KM_TRACK_NOTES`. Opt in with git-crypt.
 - **Secrets never tracked.** `.gitignore` excludes `.env*`, `*.pem`, `*.key`, `*.crt`, `*credentials*`, `id_rsa*`, `id_ed25519*`.
-- AI assistants don't read `private-*/` — see `ai-instructions.md`.
-- `okm grep/tags/files/tagged/recent` skip `private-*/` by default (`KM_INCLUDE_PRIVATE=1` to scan).
+- AI assistants don't read `private/` — see `docs/ai-instructions.md`.
+- `okm grep/tags/files/tagged/recent` skip `private/` by default (`KM_INCLUDE_PRIVATE=1` to scan).
 - Never touch user global configs (`~/.config/nvim`, `~/.zshrc`, etc.).
 - **WSL2:** setup installs a Nerd Font to Windows fonts and may update Windows Terminal. Disable: `KM_INSTALL_FONT=0`.
 
@@ -128,7 +146,7 @@ Vault follows [PARA](https://fortelabs.com/blog/para/). `private-{daily,inbox,at
 | Subcommand | What it does |
 |---|---|
 | `okm today` | Open/create today's daily note |
-| `okm new <title>` | Create slugified note in `inbox/` with frontmatter |
+| `okm new <title>` | Create slugified note in `public/inbox/` with frontmatter |
 | `okm capture [text]` | Timestamped quick-capture note |
 | `okm spot <url>` | Create note from Spotify link (episode, track, album, playlist) |
 | `okm open [path]` | Open a note or launch fzf picker |
@@ -150,8 +168,8 @@ Vault follows [PARA](https://fortelabs.com/blog/para/). `private-{daily,inbox,at
 | Variable | Default | Purpose |
 |---|---|---|
 | `OBSIDIAN_VAULT` | `../knowledge-management` | Vault root |
-| `OBSIDIAN_DAILY_DIR` | `daily` | Where `okm today` writes |
-| `OBSIDIAN_NOTES_DIR` | `inbox` | Where `okm new`/`capture` write |
+| `OBSIDIAN_DAILY_DIR` | `public/daily` | Where `okm today` writes |
+| `OBSIDIAN_NOTES_DIR` | `public/inbox` | Where `okm new`/`capture` write |
 | `EDITOR` | `nvim` | Editor for note commands |
 | `KM_TRACK_NOTES` | `true` | Track notes in git |
 
@@ -183,7 +201,7 @@ Tools: yt-dlp, spotdl, whisperX (large-v3-turbo), ffmpeg, mpv (`s` key → scree
 
 ## Templates
 
-`inbox/templates/` — one canonical template per note type with a `<!-- Format Specification: -->` block.
+`public/inbox/templates/` — one canonical template per note type with a `<!-- Format Specification: -->` block.
 
 | Template | Producer |
 |---|---|
@@ -202,8 +220,8 @@ Tools: yt-dlp, spotdl, whisperX (large-v3-turbo), ffmpeg, mpv (`s` key → scree
 
 | Schedule | Script | Output |
 |---|---|---|
-| 07:00, 12:00, 15:00 | `todo-summary.sh --output` | `inbox/todo-summary-YYYY.md` |
-| 07:00, 12:00, 15:00 | `weekly-tasks.sh --output` | `inbox/weekly-DATE-to-DATE.md` |
+| 07:00, 12:00, 15:00 | `todo-summary.sh --output` | `public/inbox/todo-summary-YYYY.md` |
+| 07:00, 12:00, 15:00 | `weekly-tasks.sh --output` | `public/inbox/weekly-DATE-to-DATE.md` |
 | 17:00 | `compress-images.py` | PNG/JPG → WebP |
 
 TODO → PARA: `TODO/FIXME/HACK/XXX` = Projects, `- [ ]` = Areas, `REVIEW:` = Resources.
@@ -228,12 +246,12 @@ Advanced: `lazygit -p "$(okm path)"` or `git -C "$(okm path)" <cmd>`.
 
 ## Advanced: git-crypt
 
-Encrypts `daily/*.md` and `inbox/*.md` in the remote (AES-256-CTR). Plaintext locally, opaque on remote.
+Encrypts `public/daily/*.md` and `public/inbox/*.md` in the remote (AES-256-CTR). Plaintext locally, opaque on remote.
 
 ```bash
 sudo apt install git-crypt && cd "$(okm path)" && git-crypt init
 git-crypt export-key ~/git-crypt-km.key   # BACK THIS UP
-printf 'daily/*.md filter=git-crypt diff=git-crypt\ninbox/*.md filter=git-crypt diff=git-crypt\n' >> .gitattributes
+printf 'public/daily/*.md filter=git-crypt diff=git-crypt\npublic/inbox/*.md filter=git-crypt diff=git-crypt\n' >> .gitattributes
 git add .gitattributes && git commit -m "configure git-crypt"
 # New machine: git clone <url> && git-crypt unlock ~/git-crypt-km.key
 ```
@@ -254,7 +272,7 @@ git add .gitattributes && git commit -m "configure git-crypt"
 
 ## Out of scope
 
-`private-*/` bodies (AI-private) · `_skills/` (manually curated) · `okm link/backlinks/stats` (one-liner `rg`) · `okm archive/template` (Obsidian handles) · auto-sync cron (silent push risk)
+`private/` bodies (AI-private) · `docs/skills/` (manually curated) · `okm link/backlinks/stats` (one-liner `rg`) · `okm archive/template` (Obsidian handles) · auto-sync cron (silent push risk)
 
 ---
 
@@ -274,7 +292,7 @@ git add .gitattributes && git commit -m "configure git-crypt"
 | Cluster | Summary |
 |---|---|
 | **Tagging** | Boundary regex, injection-safe dedup, frontmatter-less handling, hierarchical tags via awk |
-| **Privacy** | Vault `.gitignore`; `private-*/` exclusion; `okm audit`; fork-safety docs |
+| **Privacy** | Vault `.gitignore`; `private/` exclusion; `okm audit`; fork-safety docs |
 | **Path safety** | `okm open`/`sync` vault-boundary checks; `list_notes` excludes `.git/` |
 | **Input validation** | YAML escaping; slug fail-closed; Spotify ID validation; `validate_tag` on flags |
 | **Templates** | Single-source placeholder substitution across all four producers |
@@ -282,7 +300,7 @@ git add .gitattributes && git commit -m "configure git-crypt"
 | **Test/CI** | 280+ BATS tests isolated via `FAKE_VAULT_DIR`; CI green on main |
 | **Skills** | PARA banners (nvim/vim); typed templates; `seed-demo.sh`; direnv; distill prompt |
 
-**Don't regress in v1+:** 280+ BATS tests isolated via `FAKE_VAULT_DIR` + fake `$HOME` · `scripts/lib/scan.sh` shared library (not duplicated) · idempotent `setup-km.sh`/`okm new/today/spot` · `verify-km.sh` exit-code discipline (FAIL blocks, WARN doesn't) · `_skills/`/`private-*` privacy boundary · minimal correct CI.
+**Don't regress in v1+:** 280+ BATS tests isolated via `FAKE_VAULT_DIR` + fake `$HOME` · `scripts/lib/scan.sh` shared library (not duplicated) · idempotent `scripts/setup-km.sh`/`okm new/today/spot` · `scripts/verify-km.sh` exit-code discipline (FAIL blocks, WARN doesn't) · `docs/skills/`/`private/` privacy boundary · minimal correct CI.
 
 ### v1 — in design
 
@@ -407,7 +425,7 @@ git push contrib feature/foo
 # Then open PR: contrib/feature/foo → upstream/main
 ```
 
-**Invariant:** vault data (`daily/`, `inbox/`, `archive/`) must never appear in any commit on a PR branch. `okm audit --code-only` checks this.
+**Invariant:** vault data (`public/daily/`, `public/inbox/`, `public/archive/`) must never appear in any commit on a PR branch. `okm audit --code-only` checks this.
 
 **Open questions:** Should `setup-km.sh` create the contrib remote automatically? Should `okm port` set up a codespace config?
 
@@ -536,7 +554,7 @@ Port slow Bash/Python utilities (fuzz harness, `okm audit`, large TODO scans) to
 
 ## Open-sourcing checklist
 
-- [x] **Personal notes stripped from history** — `daily/*.md` and `inbox/*.md` (non-template) purged via `git filter-repo`. Templates in `inbox/templates/` retained.
+- [x] **Personal notes stripped from history** — `public/daily/*.md` and `public/inbox/*.md` (non-template) purged via `git filter-repo`. Templates in `public/inbox/templates/` retained.
 - [x] **Large binaries stripped from history** — `bin/nvim`, `bin/nvim.bin`, `bin/lazygit`, and `bin/nvim-runtime/` removed. `setup-km.sh` downloads them at install time.
 - [x] **Hardcoded handle replaced** — `CONTRIBUTING.md` now uses `{your-handle}` placeholder.
 - [x] **Release-readiness auditor** — `scripts/check-release-ready.sh` exits non-zero if binaries, personal notes, PII patterns, or secrets are detected.
@@ -547,7 +565,7 @@ Port slow Bash/Python utilities (fuzz harness, `okm audit`, large TODO scans) to
 
 ## See Also
 
-- [`ai-instructions.md`](ai-instructions.md) — AI assistant rules
-- [`_skills/README.md`](_skills/README.md) — AI skills library
+- [`docs/ai-instructions.md`](docs/ai-instructions.md) — AI assistant rules
+- [`docs/skills/README.md`](docs/skills/README.md) — AI skills library
 - [`scripts/README.md`](scripts/README.md) — cron job docs
-- [`setup-km.sh`](setup-km.sh) — canonical source for versions and defaults
+- [`scripts/setup-km.sh`](scripts/setup-km.sh) — canonical source for versions and defaults

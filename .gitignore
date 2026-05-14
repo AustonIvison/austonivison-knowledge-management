@@ -16,32 +16,32 @@ id_ed25519.*
 
 # Private notes — local-only by default (N3). Opt in by removing these lines
 # (e.g. when you've initialised git-crypt and want history under encryption).
-private-daily/*.md
-private-inbox/*.md
-private-archive/*.md
-private-attachments/*
+private/daily/*.md
+private/inbox/*.md
+private/archive/*.md
+private/attachments/*
 
-# Installed binaries (built/downloaded by setup-km.sh, not source)
+# Installed binaries (built/downloaded by scripts/setup-km.sh, not source)
 bin/nvim
 bin/nvim.bin
 bin/nvim-runtime/
 bin/lazygit
 
 # Vault notes (excluded when KM_TRACK_NOTES=false; templates always kept)
-inbox/*.md
-!inbox/templates/
+public/inbox/*.md
+!public/inbox/templates/
 
 # Large or binary attachments (track explicitly if needed)
-attachments/*.pdf
-attachments/*.zip
-attachments/*.tar.gz
-attachments/*.mp4
-attachments/*.mov
-attachments/*.png
-attachments/*.jpg
-attachments/*.jpeg
-attachments/*.gif
-attachments/*.webp
+public/attachments/*.pdf
+public/attachments/*.zip
+public/attachments/*.tar.gz
+public/attachments/*.mp4
+public/attachments/*.mov
+public/attachments/*.png
+public/attachments/*.jpg
+public/attachments/*.jpeg
+public/attachments/*.gif
+public/attachments/*.webp
 
 # Python venv and package artifacts
 venv/

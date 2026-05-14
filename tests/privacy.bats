@@ -95,27 +95,27 @@ setup() {
 # ---------------------------------------------------------------------------
 
 @test "km_is_note_path: daily note is a personal note" {
-    run km_is_note_path "daily/2026-05-13.md"
+    run km_is_note_path "public/daily/2026-05-13.md"
     assert_success
 }
 
 @test "km_is_note_path: archive note is a personal note" {
-    run km_is_note_path "archive/completed-project.md"
+    run km_is_note_path "public/archive/completed-project.md"
     assert_success
 }
 
 @test "km_is_note_path: inbox note is a personal note" {
-    run km_is_note_path "inbox/my-note.md"
+    run km_is_note_path "public/inbox/my-note.md"
     assert_success
 }
 
 @test "km_is_note_path: inbox template is NOT a personal note" {
-    run km_is_note_path "inbox/templates/daily-template.md"
+    run km_is_note_path "public/inbox/templates/daily-template.md"
     assert_failure
 }
 
 @test "km_is_note_path: attachment is NOT a personal note" {
-    run km_is_note_path "attachments/screenshot.png"
+    run km_is_note_path "public/attachments/screenshot.png"
     assert_failure
 }
 
@@ -220,7 +220,7 @@ _load_setup_km_functions() {
     export VAULT_DIR="${FAKE_VAULT_DIR}"
     export BIN_DIR="${FAKE_PROJECT_DIR}/bin"
     local funcs_src
-    funcs_src="$(sed -n '1,/^# --- Install steps ---/p' "${PROJECT_ROOT}/setup-km.sh" \
+    funcs_src="$(sed -n '1,/^# --- Install steps ---/p' "${PROJECT_ROOT}/scripts/setup-km.sh" \
         | sed 's/^set -euo pipefail/set +e; set -uo pipefail/' \
         | grep -v '^mkdir -p "\${LOG_DIR}"' \
         | grep -v "^trap ")"
@@ -378,7 +378,8 @@ _install_hook_in_temp_vault() {
     git -C "${FAKE_VAULT_DIR}" config user.email "test@test.com"
     git -C "${FAKE_VAULT_DIR}" config user.name "Test"
     # Make an initial commit so there's something to push
-    echo "test" > "${FAKE_VAULT_DIR}/daily/2026-05-13.md"
+    mkdir -p "${FAKE_VAULT_DIR}/public/daily"
+    echo "test" > "${FAKE_VAULT_DIR}/public/daily/2026-05-13.md"
     git -C "${FAKE_VAULT_DIR}" add -A
     git -C "${FAKE_VAULT_DIR}" commit -m "initial" -q
     # Point upstream to something (fake)
@@ -397,7 +398,8 @@ _install_hook_in_temp_vault() {
     git -C "${FAKE_VAULT_DIR}" remote add origin "git@github.com:alice/vault.git"
     git -C "${FAKE_VAULT_DIR}" config user.email "test@test.com"
     git -C "${FAKE_VAULT_DIR}" config user.name "Test"
-    echo "test" > "${FAKE_VAULT_DIR}/daily/2026-05-13.md"
+    mkdir -p "${FAKE_VAULT_DIR}/public/daily"
+    echo "test" > "${FAKE_VAULT_DIR}/public/daily/2026-05-13.md"
     git -C "${FAKE_VAULT_DIR}" add -A
     git -C "${FAKE_VAULT_DIR}" commit -m "initial" -q
     # No upstream branch configured → sync prints "No upstream configured"

@@ -17,7 +17,7 @@ setup() {
 
     # Extract function definitions up to "# --- Install steps ---"
     local funcs_src
-    funcs_src="$(sed -n '1,/^# --- Install steps ---/p' "${PROJECT_ROOT}/setup-km.sh" \
+    funcs_src="$(sed -n '1,/^# --- Install steps ---/p' "${PROJECT_ROOT}/scripts/setup-km.sh" \
         | sed 's/^set -euo pipefail/set +e; set -uo pipefail/' \
         | grep -v '^mkdir -p "\${LOG_DIR}"' \
         | grep -v "^trap ")"
@@ -55,18 +55,18 @@ setup() {
     local target="${TEST_TEMP_DIR}/vault-test"
     mkdir -p "$target"
     KM_TRACK_NOTES=false ensure_gitignore "$target"
-    grep -q "daily/*.md" "${target}/.gitignore"
-    grep -q "inbox/*.md" "${target}/.gitignore"
-    grep -q "archive/*.md" "${target}/.gitignore"
+    grep -q "public/daily/\*.md" "${target}/.gitignore"
+    grep -q "public/inbox/\*.md" "${target}/.gitignore"
+    grep -q "public/archive/\*.md" "${target}/.gitignore"
 }
 
 @test "ensure_gitignore tracks notes when KM_TRACK_NOTES=true" {
     local target="${TEST_TEMP_DIR}/vault-test"
     mkdir -p "$target"
     KM_TRACK_NOTES=true ensure_gitignore "$target"
-    ! grep -q "daily/*.md" "${target}/.gitignore"
-    ! grep -q "inbox/*.md" "${target}/.gitignore"
-    ! grep -q "archive/*.md" "${target}/.gitignore"
+    ! grep -q "public/daily/\*.md" "${target}/.gitignore"
+    ! grep -q "public/inbox/\*.md" "${target}/.gitignore"
+    ! grep -q "public/archive/\*.md" "${target}/.gitignore"
 }
 
 @test "B5: ensure_gitignore excludes secret patterns regardless of KM_TRACK_NOTES" {
@@ -83,14 +83,14 @@ setup() {
     grep -q '^id_ed25519$' "${target}/.gitignore"
 }
 
-@test "N3: ensure_gitignore excludes private-*/ folders regardless of KM_TRACK_NOTES" {
+@test "N3: ensure_gitignore excludes private/ folders regardless of KM_TRACK_NOTES" {
     local target="${TEST_TEMP_DIR}/vault-private"
     mkdir -p "$target"
     KM_TRACK_NOTES=true ensure_gitignore "$target"
-    grep -q '^private-daily/\*\.md$' "${target}/.gitignore"
-    grep -q '^private-inbox/\*\.md$' "${target}/.gitignore"
-    grep -q '^private-archive/\*\.md$' "${target}/.gitignore"
-    grep -q '^private-attachments/\*$' "${target}/.gitignore"
+    grep -q '^private/daily/\*\.md$' "${target}/.gitignore"
+    grep -q '^private/inbox/\*\.md$' "${target}/.gitignore"
+    grep -q '^private/archive/\*\.md$' "${target}/.gitignore"
+    grep -q '^private/attachments/\*$' "${target}/.gitignore"
 }
 
 @test "ensure_gitignore is idempotent" {
@@ -238,28 +238,28 @@ WRAPPER
 @test "install_nerd_font font family name matches Windows Terminal config" {
     grep -qi 'microsoft' /proc/version 2>/dev/null || skip "not WSL2"
     # The setup script must use "JetBrainsMono NF" (actual registered family name)
-    grep -q 'JetBrainsMono NF' "${PROJECT_ROOT}/setup-km.sh"
+    grep -q 'JetBrainsMono NF' "${PROJECT_ROOT}/scripts/setup-km.sh"
 }
 
 @test "setup-km.sh install_nerd_font handles all platforms" {
     # Function must exist and handle linux, macos, and WSL2
-    grep -q 'is_wsl2' "${PROJECT_ROOT}/setup-km.sh"
-    grep -q 'macos.*Library/Fonts' "${PROJECT_ROOT}/setup-km.sh"
-    grep -q '\.local/share/fonts' "${PROJECT_ROOT}/setup-km.sh"
+    grep -q 'is_wsl2' "${PROJECT_ROOT}/scripts/setup-km.sh"
+    grep -q 'macos.*Library/Fonts' "${PROJECT_ROOT}/scripts/setup-km.sh"
+    grep -q '\.local/share/fonts' "${PROJECT_ROOT}/scripts/setup-km.sh"
 }
 
 # === Scoping guarantees ===
 
 @test "setup-km.sh does not reference ~/.zshrc for writes" {
     # The script should not contain ensure_shell_line or replace_shell_line calls
-    run grep -c 'ensure_shell_line\|replace_shell_line' "${PROJECT_ROOT}/setup-km.sh"
+    run grep -c 'ensure_shell_line\|replace_shell_line' "${PROJECT_ROOT}/scripts/setup-km.sh"
     assert_output "0"
 }
 
 @test "setup-km.sh does not symlink ~/.config/nvim" {
     # Should only reference ~/.config/km, never ~/.config/nvim for symlinking
     local nvim_refs
-    nvim_refs=$(grep '\.config/nvim' "${PROJECT_ROOT}/setup-km.sh" | grep -cv '#\|log_info\|log_warn\|echo' || true)
+    nvim_refs=$(grep '\.config/nvim' "${PROJECT_ROOT}/scripts/setup-km.sh" | grep -cv '#\|log_info\|log_warn\|echo' || true)
     [ "$nvim_refs" -eq 0 ]
 }
 
@@ -272,13 +272,13 @@ WRAPPER
 # === Flatpak user-mode (WSL2 has no polkit for system flatpak ops) ===
 
 @test "flatpak remote-add uses --user (WSL2 has no polkit)" {
-    run grep -c 'flatpak remote-add --user' "${PROJECT_ROOT}/setup-km.sh"
+    run grep -c 'flatpak remote-add --user' "${PROJECT_ROOT}/scripts/setup-km.sh"
     assert_success
     [ "$output" -ge 1 ]
 }
 
 @test "flatpak install uses --user" {
-    run grep -c 'flatpak install --user' "${PROJECT_ROOT}/setup-km.sh"
+    run grep -c 'flatpak install --user' "${PROJECT_ROOT}/scripts/setup-km.sh"
     assert_success
     [ "$output" -ge 1 ]
 }
@@ -286,13 +286,13 @@ WRAPPER
 @test "flatpak remotes query uses --user for consistency" {
     # Without --user on the read side, skip-detection looks at the wrong
     # installation and we'd retry remote-add on every run.
-    run grep -c 'flatpak remotes --user' "${PROJECT_ROOT}/setup-km.sh"
+    run grep -c 'flatpak remotes --user' "${PROJECT_ROOT}/scripts/setup-km.sh"
     assert_success
     [ "$output" -ge 1 ]
 }
 
 @test "flatpak list query uses --user for consistency" {
-    run grep -c 'flatpak list --user' "${PROJECT_ROOT}/setup-km.sh"
+    run grep -c 'flatpak list --user' "${PROJECT_ROOT}/scripts/setup-km.sh"
     assert_success
     [ "$output" -ge 1 ]
 }

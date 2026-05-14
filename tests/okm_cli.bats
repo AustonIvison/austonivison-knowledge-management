@@ -8,8 +8,8 @@ setup() {
 
     OKM="${PROJECT_ROOT}/bin/okm"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
-    export OBSIDIAN_DAILY_DIR="daily"
-    export OBSIDIAN_NOTES_DIR="inbox"
+    export OBSIDIAN_DAILY_DIR="public/daily"
+    export OBSIDIAN_NOTES_DIR="public/inbox"
     # Use 'true' as editor so exec doesn't launch an interactive editor
     export EDITOR="true"
 }
@@ -51,7 +51,7 @@ setup() {
 
 @test "okm new creates note with frontmatter" {
     run "${OKM}" new "Test Note Title"
-    local file="${FAKE_VAULT_DIR}/inbox/test-note-title.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/test-note-title.md"
     [ -f "$file" ]
     grep -q 'title: "Test Note Title"' "$file"
     grep -q "created:" "$file"
@@ -61,7 +61,7 @@ setup() {
 
 @test "okm new slugifies the title correctly" {
     run "${OKM}" new "My Cool Note!!!"
-    local file="${FAKE_VAULT_DIR}/inbox/my-cool-note.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/my-cool-note.md"
     [ -f "$file" ]
 }
 
@@ -72,7 +72,7 @@ setup() {
 }
 
 @test "okm new is idempotent (does not overwrite existing)" {
-    local file="${FAKE_VAULT_DIR}/inbox/existing-note.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/existing-note.md"
     echo "original content" > "$file"
     run "${OKM}" new "Existing Note"
     # File should still contain original content
@@ -85,7 +85,7 @@ setup() {
     run "${OKM}" capture "quick thought"
     # Find the created file (matches YYYYMMDD-HHMMSS.md pattern)
     local found
-    found=$(find "${FAKE_VAULT_DIR}/inbox" -name '*.md' -newer "${FAKE_VAULT_DIR}" | head -1)
+    found=$(find "${FAKE_VAULT_DIR}/public/inbox" -name '*.md' -newer "${FAKE_VAULT_DIR}" | head -1)
     [ -n "$found" ]
     grep -q "Quick Capture" "$found"
     grep -q "quick thought" "$found"
@@ -98,7 +98,7 @@ setup() {
     run "${OKM}" today
     local today
     today="$(date +%F)"
-    local file="${FAKE_VAULT_DIR}/daily/${today}.md"
+    local file="${FAKE_VAULT_DIR}/public/daily/${today}.md"
     [ -f "$file" ]
     grep -q "date: ${today}" "$file"
     grep -q "## Captures" "$file"
@@ -111,7 +111,7 @@ setup() {
 @test "okm today is idempotent (does not overwrite)" {
     local today
     today="$(date +%F)"
-    local file="${FAKE_VAULT_DIR}/daily/${today}.md"
+    local file="${FAKE_VAULT_DIR}/public/daily/${today}.md"
     # Create it first
     run "${OKM}" today
     [ -f "$file" ]
@@ -125,17 +125,17 @@ setup() {
 }
 
 @test "okm today creates daily and inbox dirs if missing" {
-    rm -rf "${FAKE_VAULT_DIR}/daily" "${FAKE_VAULT_DIR}/inbox"
+    rm -rf "${FAKE_VAULT_DIR}/public/daily" "${FAKE_VAULT_DIR}/public/inbox"
     run "${OKM}" today
-    [ -d "${FAKE_VAULT_DIR}/daily" ]
-    [ -d "${FAKE_VAULT_DIR}/inbox" ]
+    [ -d "${FAKE_VAULT_DIR}/public/daily" ]
+    [ -d "${FAKE_VAULT_DIR}/public/inbox" ]
 }
 
 # === okm files ===
 
 @test "okm files lists .md files" {
-    echo "test" > "${FAKE_VAULT_DIR}/inbox/alpha.md"
-    echo "test" > "${FAKE_VAULT_DIR}/inbox/beta.md"
+    echo "test" > "${FAKE_VAULT_DIR}/public/inbox/alpha.md"
+    echo "test" > "${FAKE_VAULT_DIR}/public/inbox/beta.md"
     run "${OKM}" files
     assert_success
     assert_output --partial "alpha.md"
@@ -143,8 +143,8 @@ setup() {
 }
 
 @test "okm files with pattern filters results" {
-    echo "test" > "${FAKE_VAULT_DIR}/inbox/alpha.md"
-    echo "test" > "${FAKE_VAULT_DIR}/inbox/beta.md"
+    echo "test" > "${FAKE_VAULT_DIR}/public/inbox/alpha.md"
+    echo "test" > "${FAKE_VAULT_DIR}/public/inbox/beta.md"
     run "${OKM}" files alpha
     assert_success
     assert_output --partial "alpha.md"
@@ -154,7 +154,7 @@ setup() {
 # === okm grep ===
 
 @test "okm grep finds pattern in vault" {
-    echo "unique-test-string-42" > "${FAKE_VAULT_DIR}/inbox/searchable.md"
+    echo "unique-test-string-42" > "${FAKE_VAULT_DIR}/public/inbox/searchable.md"
     run "${OKM}" grep "unique-test-string-42"
     assert_success
     assert_output --partial "unique-test-string-42"
@@ -178,11 +178,11 @@ setup() {
     git -C "${FAKE_VAULT_DIR}" init -b main
     git -C "${FAKE_VAULT_DIR}" config user.email "test@test.com"
     git -C "${FAKE_VAULT_DIR}" config user.name "Test"
-    echo "initial" > "${FAKE_VAULT_DIR}/inbox/note.md"
+    echo "initial" > "${FAKE_VAULT_DIR}/public/inbox/note.md"
     git -C "${FAKE_VAULT_DIR}" add -A
     git -C "${FAKE_VAULT_DIR}" commit -m "initial"
     # Add a new file
-    echo "new content" > "${FAKE_VAULT_DIR}/inbox/new-note.md"
+    echo "new content" > "${FAKE_VAULT_DIR}/public/inbox/new-note.md"
     run "${OKM}" sync "test commit message"
     assert_success
     # Verify commit exists
@@ -207,7 +207,7 @@ setup() {
 @test "okm spot creates episode note with podcast template" {
     run "${OKM}" spot "https://open.spotify.com/episode/5sNnwbraj8xpzCZ87iASXi"
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/spotify-episode-5snnwbraj8xpzcz87iasxi.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/spotify-episode-5snnwbraj8xpzcz87iasxi.md"
     [ -f "$file" ]
     grep -q "source_type: spotify-episode" "$file"
     grep -q "source_url:" "$file"
@@ -221,7 +221,7 @@ setup() {
 @test "okm spot creates track note with music template" {
     run "${OKM}" spot "https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6"
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/spotify-track-6rqhfgbbkwnb9mlmuqdhg6.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/spotify-track-6rqhfgbbkwnb9mlmuqdhg6.md"
     [ -f "$file" ]
     grep -q "source_type: spotify-track" "$file"
     grep -q "source/music" "$file"
@@ -235,7 +235,7 @@ setup() {
 @test "okm spot creates album note" {
     run "${OKM}" spot "https://open.spotify.com/album/1DFixLWuPkv3KT3TnV35m3"
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/spotify-album-1dfixlwupkv3kt3tnv35m3.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/spotify-album-1dfixlwupkv3kt3tnv35m3.md"
     [ -f "$file" ]
     grep -q "source_type: spotify-album" "$file"
 }
@@ -243,7 +243,7 @@ setup() {
 @test "okm spot creates playlist note" {
     run "${OKM}" spot "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/spotify-playlist-37i9dqzf1dxcbwigoybm5m.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/spotify-playlist-37i9dqzf1dxcbwigoybm5m.md"
     [ -f "$file" ]
     grep -q "source_type: spotify-playlist" "$file"
     grep -q "source/playlist" "$file"
@@ -251,7 +251,7 @@ setup() {
 
 @test "okm spot is idempotent (does not overwrite existing)" {
     run "${OKM}" spot "https://open.spotify.com/episode/5sNnwbraj8xpzCZ87iASXi"
-    local file="${FAKE_VAULT_DIR}/inbox/spotify-episode-5snnwbraj8xpzcz87iasxi.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/spotify-episode-5snnwbraj8xpzcz87iasxi.md"
     [ -f "$file" ]
     echo "user added content" >> "$file"
     run "${OKM}" spot "https://open.spotify.com/episode/5sNnwbraj8xpzCZ87iASXi"
@@ -261,13 +261,13 @@ setup() {
 
 @test "okm spot embed URL has correct format" {
     run "${OKM}" spot "https://open.spotify.com/episode/5sNnwbraj8xpzCZ87iASXi"
-    local file="${FAKE_VAULT_DIR}/inbox/spotify-episode-5snnwbraj8xpzcz87iasxi.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/spotify-episode-5snnwbraj8xpzcz87iasxi.md"
     grep -q "https://open.spotify.com/embed/episode/5sNnwbraj8xpzCZ87iASXi" "$file"
 }
 
 @test "okm spot includes Listen on Spotify link" {
     run "${OKM}" spot "https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6"
-    local file="${FAKE_VAULT_DIR}/inbox/spotify-track-6rqhfgbbkwnb9mlmuqdhg6.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/spotify-track-6rqhfgbbkwnb9mlmuqdhg6.md"
     grep -q "Listen on Spotify" "$file"
 }
 
@@ -275,7 +275,7 @@ setup() {
     git -C "${FAKE_VAULT_DIR}" init -b main
     git -C "${FAKE_VAULT_DIR}" config user.email "test@test.com"
     git -C "${FAKE_VAULT_DIR}" config user.name "Test"
-    echo "content" > "${FAKE_VAULT_DIR}/inbox/note.md"
+    echo "content" > "${FAKE_VAULT_DIR}/public/inbox/note.md"
     git -C "${FAKE_VAULT_DIR}" add -A
     git -C "${FAKE_VAULT_DIR}" commit -m "initial"
     run "${OKM}" sync
@@ -286,29 +286,29 @@ setup() {
 # === N12: privacy — read-side commands skip private-*/ by default ===
 
 setup_privacy_fixture() {
-    mkdir -p "${FAKE_VAULT_DIR}/private-inbox"
-    create_vault_file "inbox/public-note.md" "---
+    mkdir -p "${FAKE_VAULT_DIR}/private/inbox"
+    create_vault_file "public/inbox/public-note.md" "---
 title: Public
 tags: [public-tag]
 ---
 public secret payload"
-    create_vault_file "private-inbox/secret.md" "---
+    create_vault_file "private/inbox/secret.md" "---
 title: Secret
 tags: [therapy, abusive-boss-name]
 ---
 private secret payload"
 }
 
-@test "N12: okm grep skips private-*/ by default" {
+@test "N12: okm grep skips private/ by default" {
     setup_privacy_fixture
     run "${OKM}" grep "secret payload"
     assert_success
     assert_output --partial "public-note.md"
-    refute_output --partial "private-inbox"
+    refute_output --partial "private/inbox"
     refute_output --partial "abusive"
 }
 
-@test "N12: okm tags (vault-wide) skips private-*/ by default" {
+@test "N12: okm tags (vault-wide) skips private/ by default" {
     setup_privacy_fixture
     run "${OKM}" tags
     assert_success
@@ -317,36 +317,36 @@ private secret payload"
     refute_output --partial "abusive-boss-name"
 }
 
-@test "N12: okm files skips private-*/ by default" {
+@test "N12: okm files skips private/ by default" {
     setup_privacy_fixture
     run "${OKM}" files
     assert_success
-    assert_output --partial "inbox/public-note.md"
-    refute_output --partial "private-inbox"
+    assert_output --partial "public/inbox/public-note.md"
+    refute_output --partial "private/inbox"
 }
 
-@test "N12: okm tagged skips private-*/ by default" {
+@test "N12: okm tagged skips private/ by default" {
     setup_privacy_fixture
     run "${OKM}" tagged "therapy"
     assert_success
-    refute_output --partial "private-inbox"
+    refute_output --partial "private/inbox"
     refute_output --partial "secret.md"
 }
 
 @test "N12: okm tags <explicit-private-path> still works (only walking is gated)" {
     setup_privacy_fixture
-    run "${OKM}" tags "private-inbox/secret.md"
+    run "${OKM}" tags "private/inbox/secret.md"
     assert_success
     assert_output --partial "therapy"
     assert_output --partial "abusive-boss-name"
 }
 
-@test "N12: KM_INCLUDE_PRIVATE=1 opt-in restores private-*/ scanning" {
+@test "N12: KM_INCLUDE_PRIVATE=1 opt-in restores private/ scanning" {
     setup_privacy_fixture
     KM_INCLUDE_PRIVATE=1 run "${OKM}" grep "secret payload"
     assert_success
     assert_output --partial "public-note.md"
-    assert_output --partial "private-inbox/secret.md"
+    assert_output --partial "private/inbox/secret.md"
 }
 
 @test "N12: KM_INCLUDE_PRIVATE=1 surfaces private tags in vault-wide tags listing" {
@@ -361,7 +361,7 @@ private secret payload"
 @test "N13: okm new escapes double-quotes in YAML title" {
     run "${OKM}" new 'Lessons from "The Manager"'
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/lessons-from-the-manager.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/lessons-from-the-manager.md"
     [ -f "$file" ]
     grep -q 'title: "Lessons from \\"The Manager\\""' "$file"
 }
@@ -380,7 +380,7 @@ private secret payload"
     run "${OKM}" new "$long_title"
     assert_success
     local file
-    file="$(find "${FAKE_VAULT_DIR}/inbox" -name '*.md' -newer "${FAKE_VAULT_DIR}" | head -1)"
+    file="$(find "${FAKE_VAULT_DIR}/public/inbox" -name '*.md' -newer "${FAKE_VAULT_DIR}" | head -1)"
     [ -n "$file" ]
     local bname
     bname="$(basename "$file")"
@@ -390,7 +390,7 @@ private secret payload"
 @test "N20: okm new with newline in title collapses to single-line slug" {
     run "${OKM}" new $'multi\nline\ntitle'
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/multi-line-title.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/multi-line-title.md"
     [ -f "$file" ]
 }
 
@@ -413,7 +413,7 @@ private secret payload"
 @test "N26: okm new escapes backslashes in YAML title" {
     run "${OKM}" new 'test\note'
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/test-note.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/test-note.md"
     [ -f "$file" ]
     grep -q 'title: "test\\\\note"' "$file"
 }
@@ -429,7 +429,7 @@ private secret payload"
 @test "N27: okm new -t accepts valid comma-separated tags" {
     run "${OKM}" new "Tag Test" -t 'foo,bar,source/music'
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/tag-test.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/tag-test.md"
     [ -f "$file" ]
     grep -q 'tags: \[foo, bar, source/music\]' "$file"
 }
@@ -450,7 +450,7 @@ private secret payload"
 
 @test "okm recent exits cleanly with empty vault (no fzf interaction)" {
     # Stub fzf to immediately return empty (simulates no selection / Esc)
-    mkdir -p "${FAKE_VAULT_DIR}/inbox" "${FAKE_VAULT_DIR}/daily"
+    mkdir -p "${FAKE_VAULT_DIR}/public/inbox" "${FAKE_VAULT_DIR}/public/daily"
     export PATH="${BATS_TEST_TMPDIR}/stub:${PATH}"
     mkdir -p "${BATS_TEST_TMPDIR}/stub"
     printf '#!/bin/sh\nexit 130\n' > "${BATS_TEST_TMPDIR}/stub/fzf"
@@ -461,8 +461,8 @@ private secret payload"
 }
 
 @test "okm recent with one note opens editor without crashing" {
-    mkdir -p "${FAKE_VAULT_DIR}/inbox"
-    echo -e '---\ntitle: "A"\n---' > "${FAKE_VAULT_DIR}/inbox/a.md"
+    mkdir -p "${FAKE_VAULT_DIR}/public/inbox"
+    echo -e '---\ntitle: "A"\n---' > "${FAKE_VAULT_DIR}/public/inbox/a.md"
     export PATH="${BATS_TEST_TMPDIR}/stub2:${PATH}"
     mkdir -p "${BATS_TEST_TMPDIR}/stub2"
     # fzf stub: print the first line it receives (simulates selecting the note)

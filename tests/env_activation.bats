@@ -21,14 +21,14 @@ setup() {
     [ "$OBSIDIAN_VAULT" = "$expected" ]
 }
 
-@test "OBSIDIAN_DAILY_DIR is set to daily" {
+@test "OBSIDIAN_DAILY_DIR is set to public/daily" {
     source "${PROJECT_ROOT}/env.sh"
-    [ "$OBSIDIAN_DAILY_DIR" = "daily" ]
+    [ "$OBSIDIAN_DAILY_DIR" = "public/daily" ]
 }
 
-@test "OBSIDIAN_NOTES_DIR is set to inbox" {
+@test "OBSIDIAN_NOTES_DIR is set to public/inbox" {
     source "${PROJECT_ROOT}/env.sh"
-    [ "$OBSIDIAN_NOTES_DIR" = "inbox" ]
+    [ "$OBSIDIAN_NOTES_DIR" = "public/inbox" ]
 }
 
 @test "EDITOR defaults to nvim when unset" {

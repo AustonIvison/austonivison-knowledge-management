@@ -8,8 +8,8 @@ setup() {
     common_setup
 
     # Copy templates into the fake project so seed-demo can find them.
-    mkdir -p "${FAKE_PROJECT_DIR}/inbox/templates"
-    cp -r "${PROJECT_ROOT}/inbox/templates/." "${FAKE_PROJECT_DIR}/inbox/templates/"
+    mkdir -p "${FAKE_PROJECT_DIR}/public/inbox/templates"
+    cp -r "${PROJECT_ROOT}/public/inbox/templates/." "${FAKE_PROJECT_DIR}/public/inbox/templates/"
 
     # Copy the script into the fake scripts/ dir so its KM_ROOT detection
     # resolves to FAKE_PROJECT_DIR (one level up from scripts/).
@@ -58,23 +58,23 @@ demo_count() {
 
 @test "seed-demo.sh seeds files in every PARA folder" {
     bash "${FAKE_PROJECT_DIR}/scripts/seed-demo.sh"
-    [ -n "$(find "${FAKE_VAULT_DIR}/daily"       -maxdepth 1 -name 'demo-*' -type f 2>/dev/null)" ]
-    [ -n "$(find "${FAKE_VAULT_DIR}/inbox"       -maxdepth 1 -name 'demo-*' -type f 2>/dev/null)" ]
-    [ -n "$(find "${FAKE_VAULT_DIR}/attachments" -maxdepth 1 -name 'demo-*' -type f 2>/dev/null)" ]
-    [ -n "$(find "${FAKE_VAULT_DIR}/archive"     -maxdepth 1 -name 'demo-*' -type f 2>/dev/null)" ]
+    [ -n "$(find "${FAKE_VAULT_DIR}/public/daily"       -maxdepth 1 -name 'demo-*' -type f 2>/dev/null)" ]
+    [ -n "$(find "${FAKE_VAULT_DIR}/public/inbox"       -maxdepth 1 -name 'demo-*' -type f 2>/dev/null)" ]
+    [ -n "$(find "${FAKE_VAULT_DIR}/public/attachments" -maxdepth 1 -name 'demo-*' -type f 2>/dev/null)" ]
+    [ -n "$(find "${FAKE_VAULT_DIR}/public/archive"     -maxdepth 1 -name 'demo-*' -type f 2>/dev/null)" ]
 }
 
 @test "seeded files have Format Specification block stripped" {
     bash "${FAKE_PROJECT_DIR}/scripts/seed-demo.sh"
     # No demo file should still contain the Format Specification marker.
-    ! grep -l 'Format Specification:' "${FAKE_VAULT_DIR}/inbox/"demo-*.md
+    ! grep -l 'Format Specification:' "${FAKE_VAULT_DIR}/public/inbox/"demo-*.md
 }
 
 @test "seeded files have placeholders substituted (no remaining {{}})" {
     bash "${FAKE_PROJECT_DIR}/scripts/seed-demo.sh"
-    ! grep -l '{{[A-Z_]*}}' "${FAKE_VAULT_DIR}/inbox/"demo-*.md
-    ! grep -l '{{[A-Z_]*}}' "${FAKE_VAULT_DIR}/daily/"demo-*.md
-    ! grep -l '{{[A-Z_]*}}' "${FAKE_VAULT_DIR}/archive/"demo-*.md
+    ! grep -l '{{[A-Z_]*}}' "${FAKE_VAULT_DIR}/public/inbox/"demo-*.md
+    ! grep -l '{{[A-Z_]*}}' "${FAKE_VAULT_DIR}/public/daily/"demo-*.md
+    ! grep -l '{{[A-Z_]*}}' "${FAKE_VAULT_DIR}/public/archive/"demo-*.md
 }
 
 @test "seed-demo.sh is idempotent (re-run keeps count at 11)" {
@@ -102,9 +102,9 @@ demo_count() {
 @test "teardown does NOT remove non-demo files" {
     bash "${FAKE_PROJECT_DIR}/scripts/seed-demo.sh"
     # Sentinel: a real (non-demo) note in inbox/.
-    echo "real note" > "${FAKE_VAULT_DIR}/inbox/real-note.md"
+    echo "real note" > "${FAKE_VAULT_DIR}/public/inbox/real-note.md"
     bash "${FAKE_PROJECT_DIR}/scripts/seed-demo.sh" --teardown
-    [ -f "${FAKE_VAULT_DIR}/inbox/real-note.md" ]
+    [ -f "${FAKE_VAULT_DIR}/public/inbox/real-note.md" ]
 }
 
 @test "seed-demo.sh on empty vault prints zero removed (clean run)" {

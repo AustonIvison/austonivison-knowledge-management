@@ -31,7 +31,7 @@ common_setup() {
     # Create a fake project directory (mirrors real layout)
     FAKE_PROJECT_DIR="${TEST_TEMP_DIR}/fake-project"
     mkdir -p "${FAKE_PROJECT_DIR}/scripts/lib"
-    mkdir -p "${FAKE_PROJECT_DIR}/inbox"
+    mkdir -p "${FAKE_PROJECT_DIR}/public/inbox"
     mkdir -p "${FAKE_PROJECT_DIR}/bin"
     mkdir -p "${FAKE_PROJECT_DIR}/config/nvim/lua/plugins"
     mkdir -p "${FAKE_PROJECT_DIR}/config/nvim/lua/config"
@@ -43,10 +43,10 @@ common_setup() {
 
     # Create a fake vault directory
     FAKE_VAULT_DIR="${TEST_TEMP_DIR}/fake-vault"
-    mkdir -p "${FAKE_VAULT_DIR}/daily"
-    mkdir -p "${FAKE_VAULT_DIR}/inbox"
-    mkdir -p "${FAKE_VAULT_DIR}/attachments"
-    mkdir -p "${FAKE_VAULT_DIR}/archive"
+    mkdir -p "${FAKE_VAULT_DIR}/public/daily"
+    mkdir -p "${FAKE_VAULT_DIR}/public/inbox"
+    mkdir -p "${FAKE_VAULT_DIR}/public/attachments"
+    mkdir -p "${FAKE_VAULT_DIR}/public/archive"
 
     # Set vault env var to fake vault
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"

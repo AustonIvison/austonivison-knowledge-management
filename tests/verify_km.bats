@@ -8,13 +8,13 @@ setup() {
 }
 
 @test "verify-km.sh is valid bash" {
-    run bash -n "${PROJECT_ROOT}/verify-km.sh"
+    run bash -n "${PROJECT_ROOT}/scripts/verify-km.sh"
     assert_success
 }
 
 @test "output includes PASS/FAIL/WARN prefixes" {
     # Run verify against fake HOME — many checks will fail, which is expected
-    run bash "${PROJECT_ROOT}/verify-km.sh"
+    run bash "${PROJECT_ROOT}/scripts/verify-km.sh"
     # Should contain at least one [PASS] (system packages like git, rg are installed)
     echo "$output" | grep -q '\[PASS\]'
     # Should contain at least one [FAIL] (vault dir doesn't exist in fake HOME context)
@@ -22,7 +22,7 @@ setup() {
 }
 
 @test "summary line shows counts" {
-    run bash "${PROJECT_ROOT}/verify-km.sh"
+    run bash "${PROJECT_ROOT}/scripts/verify-km.sh"
     echo "$output" | grep -q 'PASS:'
     echo "$output" | grep -q 'FAIL:'
     echo "$output" | grep -q 'WARN:'
@@ -30,40 +30,40 @@ setup() {
 
 @test "exits 1 when any FAIL check triggers" {
     # With fake HOME and no vault, there will be FAILs
-    run bash "${PROJECT_ROOT}/verify-km.sh"
+    run bash "${PROJECT_ROOT}/scripts/verify-km.sh"
     assert_failure
 }
 
 @test "verify checks project binaries in SCRIPT_DIR/bin not ~/bin" {
     # verify-km.sh should reference SCRIPT_DIR/bin, not HOME/bin
-    grep -q 'SCRIPT_DIR.*bin' "${PROJECT_ROOT}/verify-km.sh"
-    ! grep -q 'HOME.*bin.*nvim\|HOME.*bin.*okm' "${PROJECT_ROOT}/verify-km.sh" || \
-        grep 'HOME.*bin' "${PROJECT_ROOT}/verify-km.sh" | grep -qv 'BIN_DIR'
+    grep -q 'SCRIPT_DIR.*bin' "${PROJECT_ROOT}/scripts/verify-km.sh"
+    ! grep -q 'HOME.*bin.*nvim\|HOME.*bin.*okm' "${PROJECT_ROOT}/scripts/verify-km.sh" || \
+        grep 'HOME.*bin' "${PROJECT_ROOT}/scripts/verify-km.sh" | grep -qv 'BIN_DIR'
 }
 
 # === Neovim installation checks ===
 
 @test "verify checks nvim.bin binary exists" {
-    grep -q 'nvim\.bin' "${PROJECT_ROOT}/verify-km.sh"
+    grep -q 'nvim\.bin' "${PROJECT_ROOT}/scripts/verify-km.sh"
 }
 
 @test "verify checks nvim runtime directory" {
-    grep -q 'nvim-runtime/share/nvim/runtime' "${PROJECT_ROOT}/verify-km.sh"
-    grep -q 'syntax/syntax.vim' "${PROJECT_ROOT}/verify-km.sh"
+    grep -q 'nvim-runtime/share/nvim/runtime' "${PROJECT_ROOT}/scripts/verify-km.sh"
+    grep -q 'syntax/syntax.vim' "${PROJECT_ROOT}/scripts/verify-km.sh"
 }
 
 @test "verify checks nvim version >= 0.10" {
-    grep -q 'nvim_minor' "${PROJECT_ROOT}/verify-km.sh"
-    grep -q '0\.10' "${PROJECT_ROOT}/verify-km.sh"
+    grep -q 'nvim_minor' "${PROJECT_ROOT}/scripts/verify-km.sh"
+    grep -q '0\.10' "${PROJECT_ROOT}/scripts/verify-km.sh"
 }
 
 @test "verify checks nvim headless startup for runtime errors" {
-    grep -q 'E484' "${PROJECT_ROOT}/verify-km.sh"
+    grep -q 'E484' "${PROJECT_ROOT}/scripts/verify-km.sh"
 }
 
 @test "verify reports PASS for nvim installation when present" {
     [ -x "${PROJECT_ROOT}/bin/nvim.bin" ] || skip "nvim not installed — run setup-km.sh first"
-    run bash "${PROJECT_ROOT}/verify-km.sh"
+    run bash "${PROJECT_ROOT}/scripts/verify-km.sh"
     echo "$output" | grep -q '\[PASS\].*nvim.bin binary present'
     echo "$output" | grep -q '\[PASS\].*nvim runtime present'
     echo "$output" | grep -q '\[PASS\].*nvim version'
@@ -73,18 +73,18 @@ setup() {
 # === Nerd Font checks ===
 
 @test "verify checks for Nerd Font installation" {
-    grep -q 'Nerd Font' "${PROJECT_ROOT}/verify-km.sh"
-    grep -q 'JetBrainsMonoNerdFont-Regular.ttf' "${PROJECT_ROOT}/verify-km.sh"
+    grep -q 'Nerd Font' "${PROJECT_ROOT}/scripts/verify-km.sh"
+    grep -q 'JetBrainsMonoNerdFont-Regular.ttf' "${PROJECT_ROOT}/scripts/verify-km.sh"
 }
 
 @test "verify Nerd Font check handles WSL2 and native Linux" {
-    grep -q 'is_wsl2' "${PROJECT_ROOT}/verify-km.sh"
-    grep -q 'Library/Fonts' "${PROJECT_ROOT}/verify-km.sh"
-    grep -q '\.local/share/fonts' "${PROJECT_ROOT}/verify-km.sh"
+    grep -q 'is_wsl2' "${PROJECT_ROOT}/scripts/verify-km.sh"
+    grep -q 'Library/Fonts' "${PROJECT_ROOT}/scripts/verify-km.sh"
+    grep -q '\.local/share/fonts' "${PROJECT_ROOT}/scripts/verify-km.sh"
 }
 
 @test "verify reports PASS for Nerd Font when installed" {
     grep -qi 'microsoft' /proc/version 2>/dev/null || skip "not WSL2"
-    run bash "${PROJECT_ROOT}/verify-km.sh"
+    run bash "${PROJECT_ROOT}/scripts/verify-km.sh"
     echo "$output" | grep -q '\[PASS\].*Nerd Font'
 }

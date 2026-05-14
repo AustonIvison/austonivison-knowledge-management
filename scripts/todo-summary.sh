@@ -43,7 +43,7 @@ else
 fi
 YEAR="$(date +%Y)"
 TODAY="$(date +%F)"
-OUTPUT_FILE="${PROJECT_DIR}/inbox/todo-summary-${YEAR}.md"
+OUTPUT_FILE="${PROJECT_DIR}/public/inbox/todo-summary-${YEAR}.md"
 
 WRITE_FILE=false
 if [[ "${1:-}" == "--output" ]]; then

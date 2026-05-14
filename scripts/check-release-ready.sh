@@ -67,21 +67,21 @@ fi
 # ── 3. Personal notes currently tracked ─────────────────────────────────────
 _head "3. Personal notes in current index"
 
-tracked_daily=$(git ls-files -- 'daily/' | grep '\.md$' || true)
+tracked_daily=$(git ls-files -- 'public/daily/' | grep '\.md$' || true)
 if [ -n "$tracked_daily" ]; then
   _fail "Daily notes still tracked:"
   echo "$tracked_daily" | sed 's/^/       /'
 else
-  _ok "No daily/*.md in index"
+  _ok "No public/daily/*.md in index"
 fi
 
-# inbox/*.md — but keep inbox/templates/ (those are source files)
-tracked_inbox=$(git ls-files -- 'inbox/' | grep '\.md$' | grep -v '^inbox/templates/' || true)
+# public/inbox/*.md — but keep public/inbox/templates/ (those are source files)
+tracked_inbox=$(git ls-files -- 'public/inbox/' | grep '\.md$' | grep -v '^public/inbox/templates/' || true)
 if [ -n "$tracked_inbox" ]; then
   _fail "Personal inbox notes still tracked (non-template):"
   echo "$tracked_inbox" | sed 's/^/       /'
 else
-  _ok "No personal inbox/*.md in index"
+  _ok "No personal public/inbox/*.md in index"
 fi
 
 # Templates must always be present
@@ -89,8 +89,8 @@ missing_templates=()
 for tmpl in daily-template note-template capture-template yt-template \
             spotify-episode-template spotify-track-template podcast-template \
             todo-summary-template weekly-template archive-template; do
-  git ls-files --error-unmatch "inbox/templates/${tmpl}.md" &>/dev/null \
-    || missing_templates+=("inbox/templates/${tmpl}.md")
+  git ls-files --error-unmatch "public/inbox/templates/${tmpl}.md" &>/dev/null \
+    || missing_templates+=("public/inbox/templates/${tmpl}.md")
 done
 if [ "${#missing_templates[@]}" -gt 0 ]; then
   _fail "Required templates missing from index:"
@@ -104,8 +104,8 @@ _head "4. Personal notes in git history"
 
 history_notes=$(git log --branches --name-only --pretty=format: \
   | grep -v '^$' | sort -u \
-  | grep -E '^(daily/|inbox/).*\.md$' \
-  | grep -v '^inbox/templates/' || true)
+  | grep -E '^(public/daily/|public/inbox/).*\.md$' \
+  | grep -v '^public/inbox/templates/' || true)
 if [ -n "$history_notes" ]; then
   _fail "Personal note paths still in git history:"
   echo "$history_notes" | sed 's/^/       /'

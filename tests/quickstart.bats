@@ -20,7 +20,7 @@ setup() {
     export BIN_DIR="${FAKE_PROJECT_DIR}/bin"
 
     local funcs_src
-    funcs_src="$(sed -n '1,/^# --- Install steps ---/p' "${PROJECT_ROOT}/setup-km.sh" \
+    funcs_src="$(sed -n '1,/^# --- Install steps ---/p' "${PROJECT_ROOT}/scripts/setup-km.sh" \
         | sed 's/^set -euo pipefail/set +e; set -uo pipefail/' \
         | grep -v '^mkdir -p "\${LOG_DIR}"' \
         | grep -v "^trap ")"
@@ -30,14 +30,14 @@ setup() {
 # === Step 1: setup-km.sh creates vault structure ===
 
 @test "quickstart: setup creates vault directories" {
-    ensure_dir "${VAULT_DIR}/daily"
-    ensure_dir "${VAULT_DIR}/inbox"
-    ensure_dir "${VAULT_DIR}/attachments"
-    ensure_dir "${VAULT_DIR}/archive"
-    [ -d "${VAULT_DIR}/daily" ]
-    [ -d "${VAULT_DIR}/inbox" ]
-    [ -d "${VAULT_DIR}/attachments" ]
-    [ -d "${VAULT_DIR}/archive" ]
+    ensure_dir "${VAULT_DIR}/public/daily"
+    ensure_dir "${VAULT_DIR}/public/inbox"
+    ensure_dir "${VAULT_DIR}/public/attachments"
+    ensure_dir "${VAULT_DIR}/public/archive"
+    [ -d "${VAULT_DIR}/public/daily" ]
+    [ -d "${VAULT_DIR}/public/inbox" ]
+    [ -d "${VAULT_DIR}/public/attachments" ]
+    [ -d "${VAULT_DIR}/public/archive" ]
 }
 
 @test "quickstart: setup creates .gitignore" {
@@ -108,21 +108,21 @@ setup() {
 @test "quickstart: okm today creates daily note in vault" {
     export EDITOR="true"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
-    export OBSIDIAN_DAILY_DIR="daily"
-    export OBSIDIAN_NOTES_DIR="inbox"
+    export OBSIDIAN_DAILY_DIR="public/daily"
+    export OBSIDIAN_NOTES_DIR="public/inbox"
     run "${PROJECT_ROOT}/bin/okm" today
     local today
     today="$(date +%F)"
-    [ -f "${FAKE_VAULT_DIR}/daily/${today}.md" ]
+    [ -f "${FAKE_VAULT_DIR}/public/daily/${today}.md" ]
 }
 
 @test "quickstart: okm new creates note in vault inbox" {
     export EDITOR="true"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
-    export OBSIDIAN_DAILY_DIR="daily"
-    export OBSIDIAN_NOTES_DIR="inbox"
+    export OBSIDIAN_DAILY_DIR="public/daily"
+    export OBSIDIAN_NOTES_DIR="public/inbox"
     run "${PROJECT_ROOT}/bin/okm" new "quickstart test note"
-    [ -f "${FAKE_VAULT_DIR}/inbox/quickstart-test-note.md" ]
+    [ -f "${FAKE_VAULT_DIR}/public/inbox/quickstart-test-note.md" ]
 }
 
 # === Full flow: setup → activate → use → verify no pollution ===
@@ -135,9 +135,9 @@ setup() {
     fi
 
     # Step 1: Run setup operations
-    ensure_dir "${VAULT_DIR}/daily"
-    ensure_dir "${VAULT_DIR}/inbox"
-    ensure_dir "${VAULT_DIR}/attachments"
+    ensure_dir "${VAULT_DIR}/public/daily"
+    ensure_dir "${VAULT_DIR}/public/inbox"
+    ensure_dir "${VAULT_DIR}/public/attachments"
     ensure_dir "${BIN_DIR}"
     ensure_gitignore "${VAULT_DIR}"
     ensure_git_repo "${VAULT_DIR}"

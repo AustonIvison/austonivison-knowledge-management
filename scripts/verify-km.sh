@@ -9,7 +9,7 @@
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ -z "${OBSIDIAN_VAULT:-}" ]; then
     _parent="$(cd "${SCRIPT_DIR}/.." && pwd)"
     _sibling="${_parent}/knowledge-management"
@@ -137,11 +137,11 @@ fi
 # ── Vault structure ──────────────────────────────────────────────────────────
 _section "Vault structure"
 
-for subdir in daily inbox attachments archive; do
+for subdir in public/daily public/inbox public/attachments public/archive; do
     if [ -d "${VAULT_DIR}/${subdir}" ]; then
         _pass "${subdir}/"
     else
-        _fail "${VAULT_DIR}/${subdir}/ missing — run: bash setup-km.sh"
+        _fail "${VAULT_DIR}/${subdir}/ missing — run: bash scripts/setup-km.sh"
     fi
 done
 

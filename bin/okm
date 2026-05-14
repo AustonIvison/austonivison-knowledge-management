@@ -15,19 +15,19 @@ else
   VAULT="${OBSIDIAN_VAULT}"
 fi
 EDITOR_CMD="${EDITOR:-vim}"
-DAILY_DIR="${OBSIDIAN_DAILY_DIR:-daily}"
-NOTES_DIR="${OBSIDIAN_NOTES_DIR:-inbox}"
+DAILY_DIR="${OBSIDIAN_DAILY_DIR:-public/daily}"
+NOTES_DIR="${OBSIDIAN_NOTES_DIR:-public/inbox}"
 
 # Privacy: by default, read-side commands (grep, tags, files, tagged, recent)
-# skip private-*/ folders so screen-shared `okm grep` can't surface private
+# skip private/ folder so screen-shared `okm grep` can't surface private
 # notes. Set KM_INCLUDE_PRIVATE=1 to opt in to scanning private folders.
 # Explicit `okm tags <private-path>` and `okm open <private-path>` still work
 # — this only affects vault-walking commands.
 PRIVATE_RG_GLOBS=()
 PRIVATE_FIND_PRUNE=()
 if [ "${KM_INCLUDE_PRIVATE:-0}" != "1" ]; then
-  PRIVATE_RG_GLOBS=(--glob '!private-*/')
-  PRIVATE_FIND_PRUNE=(-not -path "$VAULT/private-*/*")
+  PRIVATE_RG_GLOBS=(--glob '!private/')
+  PRIVATE_FIND_PRUNE=(-not -path "$VAULT/private/*")
 fi
 
 usage() {
@@ -829,8 +829,8 @@ audit_usage() {
 Usage: okm audit [--code-only|--vault-only] [--paths PATH...] [--quiet]
 
 Scan tracked content (vault by default) for:
-  - PARA content under daily/, inbox/, archive/, attachments/, private-*/
-    (skipping inbox/templates/ and demo-* files)
+  - PARA content under public/{daily,inbox,archive,attachments}/, private/
+    (skipping public/inbox/templates/ and demo-* files)
   - Secret patterns: AWS keys, GitHub tokens, BEGIN ... PRIVATE KEY blocks
   - Sensitive filenames: .env*, *.pem, *.key, *.crt, *credentials*, id_rsa*
 
@@ -915,18 +915,18 @@ audit_run() {
       # 1. PARA content (skipped under --code-only).
       if ! $code_only; then
         local skip=false
-        case "$f" in inbox/templates/*) skip=true ;; esac
+        case "$f" in public/inbox/templates/*) skip=true ;; esac
         case "$base" in demo-*) skip=true ;; esac
         if ! $skip; then
           case "$f" in
-            daily/*.md|inbox/*.md|archive/*.md)
+            public/daily/*.md|public/inbox/*.md|public/archive/*.md)
               out+="${f}:1: para-content user note in public PARA folder"$'\n'
               findings=$((findings+1)) ;;
-            attachments/*)
+            public/attachments/*)
               out+="${f}:1: para-content attachment"$'\n'
               findings=$((findings+1)) ;;
-            private-*/*)
-              out+="${f}:1: para-content file in private-*/"$'\n'
+            private/*/*)
+              out+="${f}:1: para-content file in private/"$'\n'
               findings=$((findings+1)) ;;
           esac
         fi

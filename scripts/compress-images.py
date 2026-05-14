@@ -24,10 +24,10 @@ _PROJECT_DIR = os.path.dirname(_SCRIPT_DIR)
 _SIBLING = os.path.join(os.path.dirname(_PROJECT_DIR), "knowledge-management")
 _DEFAULT_VAULT = _PROJECT_DIR if os.path.realpath(_SIBLING) == os.path.realpath(_PROJECT_DIR) else _SIBLING
 VAULT_DIR = os.environ.get("OBSIDIAN_VAULT", _DEFAULT_VAULT)
-ATTACHMENTS_DIR = os.path.join(VAULT_DIR, "attachments")
+ATTACHMENTS_DIR = os.path.join(VAULT_DIR, "public", "attachments")
 EXTENSIONS = ("*.png", "*.jpg", "*.jpeg", "*.gif")
 QUALITY = 80
-NOTE_DIRS = ("daily", "inbox", "archive", "private-daily", "private-inbox", "private-archive")
+NOTE_DIRS = ("public/daily", "public/inbox", "public/archive", "private/daily", "private/inbox", "private/archive")
 
 
 def is_animated_gif(path):

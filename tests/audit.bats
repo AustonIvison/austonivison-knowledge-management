@@ -30,44 +30,44 @@ stage_file() {
     assert_output --partial "clean"
 }
 
-@test "audit: PARA content under inbox/ is flagged" {
-    stage_file "inbox/personal.md" "private thought"
+@test "audit: PARA content under public/inbox/ is flagged" {
+    stage_file "public/inbox/personal.md" "private thought"
     run "${OKM}" audit
     assert_failure
-    assert_output --partial "inbox/personal.md"
+    assert_output --partial "public/inbox/personal.md"
     assert_output --partial "para-content"
 }
 
-@test "audit: PARA content under daily/ is flagged" {
-    stage_file "daily/2026-05-03.md" "log"
+@test "audit: PARA content under public/daily/ is flagged" {
+    stage_file "public/daily/2026-05-03.md" "log"
     run "${OKM}" audit
     assert_failure
-    assert_output --partial "daily/2026-05-03.md"
+    assert_output --partial "public/daily/2026-05-03.md"
 }
 
-@test "audit: PARA content under attachments/ is flagged" {
-    stage_file "attachments/screenshot.png" ""
+@test "audit: PARA content under public/attachments/ is flagged" {
+    stage_file "public/attachments/screenshot.png" ""
     run "${OKM}" audit
     assert_failure
-    assert_output --partial "attachments/screenshot.png"
+    assert_output --partial "public/attachments/screenshot.png"
 }
 
-@test "audit: PARA content under private-*/ is flagged" {
-    stage_file "private-inbox/secret.md" "secret"
+@test "audit: PARA content under private/ is flagged" {
+    stage_file "private/inbox/secret.md" "secret"
     run "${OKM}" audit
     assert_failure
-    assert_output --partial "private-inbox/secret.md"
+    assert_output --partial "private/inbox/secret.md"
 }
 
-@test "audit: templates under inbox/templates/ are NOT flagged" {
-    stage_file "inbox/templates/yt-template.md" "template"
+@test "audit: templates under public/inbox/templates/ are NOT flagged" {
+    stage_file "public/inbox/templates/yt-template.md" "template"
     git -C "$AUDIT_VAULT" commit -q -m templates
     run "${OKM}" audit
     assert_success
 }
 
 @test "audit: demo-* files are NOT flagged" {
-    stage_file "inbox/demo-yt-example.md" "demo"
+    stage_file "public/inbox/demo-yt-example.md" "demo"
     git -C "$AUDIT_VAULT" commit -q -m demos
     run "${OKM}" audit
     assert_success
@@ -112,12 +112,12 @@ stage_file() {
 }
 
 @test "audit: --paths restricts findings" {
-    stage_file "inbox/note.md" "x"
-    stage_file "daily/log.md" "y"
-    run "${OKM}" audit --paths inbox
+    stage_file "public/inbox/note.md" "x"
+    stage_file "public/daily/log.md" "y"
+    run "${OKM}" audit --paths public/inbox
     assert_failure
-    assert_output --partial "inbox/note.md"
-    refute_output --partial "daily/log.md"
+    assert_output --partial "public/inbox/note.md"
+    refute_output --partial "public/daily/log.md"
 }
 
 @test "audit: --code-only and --vault-only are mutually exclusive" {

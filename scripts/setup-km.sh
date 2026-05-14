@@ -31,7 +31,7 @@ _on_error() {
 trap '_on_error ${LINENO}' ERR
 
 # --- Variables ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ -z "${OBSIDIAN_VAULT:-}" ]; then
     _parent="$(cd "${SCRIPT_DIR}/.." && pwd)"
     _sibling="${_parent}/knowledge-management"
@@ -132,22 +132,22 @@ id_ed25519.*
 
 # Private notes — local-only by default (N3). Opt in by removing these lines
 # (e.g. when you've initialised git-crypt and want history under encryption).
-private-daily/*.md
-private-inbox/*.md
-private-archive/*.md
-private-attachments/*
+private/daily/*.md
+private/inbox/*.md
+private/archive/*.md
+private/attachments/*
 
 # Large or binary attachments (track explicitly if needed)
-attachments/*.pdf
-attachments/*.zip
-attachments/*.tar.gz
-attachments/*.mp4
-attachments/*.mov
-attachments/*.png
-attachments/*.jpg
-attachments/*.jpeg
-attachments/*.gif
-attachments/*.webp
+public/attachments/*.pdf
+public/attachments/*.zip
+public/attachments/*.tar.gz
+public/attachments/*.mp4
+public/attachments/*.mov
+public/attachments/*.png
+public/attachments/*.jpg
+public/attachments/*.jpeg
+public/attachments/*.gif
+public/attachments/*.webp
 
 # OS noise
 .DS_Store
@@ -164,10 +164,11 @@ GITIGNORE
     if [ "${KM_TRACK_NOTES:-false}" != "true" ]; then
         cat >> "${gitignore}" <<'PRIVATE'
 
-# Private notes — set KM_TRACK_NOTES=true before setup to track these in git
-daily/*.md
-inbox/*.md
-archive/*.md
+# Vault notes — set KM_TRACK_NOTES=true before setup to track these in git
+public/inbox/*.md
+!public/inbox/templates/
+public/daily/*.md
+public/archive/*.md
 PRIVATE
         log_info "OK: .gitignore written (notes excluded — private mode)"
     else
@@ -427,7 +428,7 @@ ensure_mpv_config() {
 # Loaded via MPV_HOME in env.sh — does NOT touch ~/.config/mpv.
 
 # Screenshots save directly into the vault attachments directory.
-screenshot-directory=${VAULT_DIR}/attachments
+screenshot-directory=${VAULT_DIR}/public/attachments
 screenshot-format=png
 screenshot-template=%F-%wH%wM%wS
 MPV_CONF
@@ -580,14 +581,25 @@ is_wsl2() {
 
 # Install direnv and hook it into ~/.bashrc so the project environment activates
 # automatically whenever the user cd's into the project directory.
+# Uses the official install script (https://direnv.net/install.sh) into
+# ~/.local/bin — no sudo required, always gets the current release.
 # Only ~/.bashrc is touched (one generic line); all project vars stay in .envrc.
 install_direnv() {
     if command -v direnv >/dev/null 2>&1; then
         log_info "SKIP: direnv already installed at $(command -v direnv)"
     else
-        log_info "ACTION: Installing direnv"
-        sudo apt install -y direnv
-        log_info "OK: direnv installed"
+        log_info "ACTION: Installing direnv via official install script"
+        local bin_dir="${HOME}/.local/bin"
+        mkdir -p "${bin_dir}"
+        export bin_path="${bin_dir}"
+        curl -sfL https://direnv.net/install.sh | bash
+        [[ ":${PATH}:" != *":${bin_dir}:"* ]] && export PATH="${bin_dir}:${PATH}"
+        if command -v direnv >/dev/null 2>&1; then
+            log_info "OK: direnv installed to ${bin_dir}"
+        else
+            log_error "FAIL: direnv install failed — check network or install manually: sudo apt install direnv"
+            return 1
+        fi
     fi
 
     local bashrc="${HOME}/.bashrc"
@@ -638,10 +650,10 @@ _parse_slug() {
 
 _is_note_path() {
     case "$1" in
-        daily/*.md)   return 0 ;;
-        archive/*.md) return 0 ;;
-        inbox/*.md)
-            case "$1" in inbox/templates/*) return 1 ;; *) return 0 ;; esac ;;
+        public/daily/*.md)   return 0 ;;
+        public/archive/*.md) return 0 ;;
+        public/inbox/*.md)
+            case "$1" in public/inbox/templates/*) return 1 ;; *) return 0 ;; esac ;;
     esac
     return 1
 }
@@ -724,10 +736,14 @@ log_info "==> Installing Obsidian"
 install_obsidian
 
 log_info "==> Creating vault structure"
-ensure_dir "${VAULT_DIR}/daily"
-ensure_dir "${VAULT_DIR}/inbox"
-ensure_dir "${VAULT_DIR}/attachments"
-ensure_dir "${VAULT_DIR}/archive"
+ensure_dir "${VAULT_DIR}/public/daily"
+ensure_dir "${VAULT_DIR}/public/inbox"
+ensure_dir "${VAULT_DIR}/public/attachments"
+ensure_dir "${VAULT_DIR}/public/archive"
+ensure_dir "${VAULT_DIR}/private/daily"
+ensure_dir "${VAULT_DIR}/private/inbox"
+ensure_dir "${VAULT_DIR}/private/attachments"
+ensure_dir "${VAULT_DIR}/private/archive"
 ensure_dir "${BIN_DIR}"
 
 log_info "==> Verifying okm CLI"
@@ -753,7 +769,7 @@ derive_default_remote
 if [ -z "${KM_TRACK_NOTES:-}" ]; then
     echo ""
     echo "Do you want to track your notes in git history?"
-    echo "  yes — notes (daily/, inbox/, archive/) are committed to git. (default)"
+    echo "  yes — notes (public/daily/, public/inbox/, public/archive/) are committed to git. (default)"
     echo "        Pair with git-crypt for encrypted remote backups."
     echo "  no  — notes are gitignored. They stay local only."
     echo ""
@@ -784,6 +800,9 @@ elif [ "${KM_TRACK_NOTES:-false}" = "true" ] && [ -z "${GIT_REMOTE}" ]; then
 fi
 
 export KM_TRACK_NOTES
+
+log_info "==> Installing direnv (auto-activate project env on cd)"
+install_direnv
 
 log_info "==> Writing .gitignore"
 ensure_gitignore "${VAULT_DIR}"
@@ -827,9 +846,6 @@ ensure_transcription_venv
 
 log_info "==> Configuring mpv screenshots"
 ensure_mpv_config
-
-log_info "==> Installing direnv (auto-activate project env on cd)"
-install_direnv
 
 log_info "==> Enforcing offline mode"
 ensure_obsidian_offline

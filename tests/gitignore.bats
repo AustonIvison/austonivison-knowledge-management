@@ -20,12 +20,12 @@ setup() {
     grep -q '^bin/lazygit$' "$GITIGNORE"
 }
 
-@test "inbox/*.md is ignored" {
-    grep -q 'inbox/\*.md' "$GITIGNORE"
+@test "public/inbox/*.md is ignored" {
+    grep -q 'public/inbox/\*.md' "$GITIGNORE"
 }
 
-@test "inbox/templates/ directory is exempted from inbox ignore" {
-    grep -q '!inbox/templates/' "$GITIGNORE"
+@test "public/inbox/templates/ directory is exempted from inbox ignore" {
+    grep -q '!public/inbox/templates/' "$GITIGNORE"
 }
 
 @test "swap files *.swp are ignored" {
@@ -37,7 +37,7 @@ setup() {
 }
 
 @test "attachment PDFs are ignored" {
-    grep -q 'attachments/\*\.pdf' "$GITIGNORE"
+    grep -q 'public/attachments/\*\.pdf' "$GITIGNORE"
 }
 
 @test ".obsidian/workspace.json is ignored" {

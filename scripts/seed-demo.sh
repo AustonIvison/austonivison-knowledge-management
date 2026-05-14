@@ -15,7 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KM_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VAULT="${OBSIDIAN_VAULT:-${KM_ROOT}}"
-TEMPLATES="${KM_ROOT}/inbox/templates"
+TEMPLATES="${KM_ROOT}/public/inbox/templates"
 
 # 1x1 transparent PNG, base64-encoded. Used as a placeholder demo screenshot.
 DEMO_PNG_B64='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQAAAAA+UJ+JAAAACklEQVQI12NgAAAAAgABc3UBGAAAAABJRU5ErkJggg=='
@@ -72,7 +72,7 @@ render_template() {
 
 teardown() {
     local removed=0 dir
-    for dir in daily inbox attachments archive; do
+    for dir in public/daily public/inbox public/attachments public/archive; do
         if [ -d "${VAULT}/${dir}" ]; then
             while IFS= read -r -d '' f; do
                 rm -f "$f" && removed=$((removed + 1))
@@ -89,7 +89,7 @@ seed() {
     fi
 
     local dir
-    for dir in daily inbox attachments archive; do
+    for dir in public/daily public/inbox public/attachments public/archive; do
         mkdir -p "${VAULT}/${dir}"
     done
 
@@ -98,29 +98,29 @@ seed() {
     year="$(date +%Y)"
     week_end="$(date -d '+6 days' +%Y-%m-%d 2>/dev/null || date -v+6d +%Y-%m-%d)"
 
-    render_template "${TEMPLATES}/daily-template.md"           "${VAULT}/daily/demo-${today}.md"                              "${today}"
-    render_template "${TEMPLATES}/note-template.md"            "${VAULT}/inbox/demo-meeting-notes.md"                          "Demo Meeting Notes"
-    render_template "${TEMPLATES}/capture-template.md"         "${VAULT}/inbox/demo-capture.md"                                "Demo Capture"
-    render_template "${TEMPLATES}/yt-template.md"              "${VAULT}/inbox/demo-yt-example.md"                             "Demo YouTube Example"
-    render_template "${TEMPLATES}/spotify-episode-template.md" "${VAULT}/inbox/demo-spotify-episode.md"                        "Demo Spotify Episode"
-    render_template "${TEMPLATES}/spotify-track-template.md"   "${VAULT}/inbox/demo-spotify-track.md"                          "Demo Spotify Track"
-    render_template "${TEMPLATES}/podcast-template.md"         "${VAULT}/inbox/demo-podcast.md"                                "Demo Podcast"
-    render_template "${TEMPLATES}/todo-summary-template.md"    "${VAULT}/inbox/demo-todo-summary-${year}.md"                   "Demo TODO Summary ${year}"
-    render_template "${TEMPLATES}/weekly-template.md"          "${VAULT}/inbox/demo-weekly-${today}-to-${week_end}.md"         "Demo Weekly ${today} to ${week_end}"
-    render_template "${TEMPLATES}/archive-template.md"         "${VAULT}/archive/demo-completed-project.md"                    "Demo Completed Project"
+    render_template "${TEMPLATES}/daily-template.md"           "${VAULT}/public/daily/demo-${today}.md"                              "${today}"
+    render_template "${TEMPLATES}/note-template.md"            "${VAULT}/public/inbox/demo-meeting-notes.md"                          "Demo Meeting Notes"
+    render_template "${TEMPLATES}/capture-template.md"         "${VAULT}/public/inbox/demo-capture.md"                                "Demo Capture"
+    render_template "${TEMPLATES}/yt-template.md"              "${VAULT}/public/inbox/demo-yt-example.md"                             "Demo YouTube Example"
+    render_template "${TEMPLATES}/spotify-episode-template.md" "${VAULT}/public/inbox/demo-spotify-episode.md"                        "Demo Spotify Episode"
+    render_template "${TEMPLATES}/spotify-track-template.md"   "${VAULT}/public/inbox/demo-spotify-track.md"                          "Demo Spotify Track"
+    render_template "${TEMPLATES}/podcast-template.md"         "${VAULT}/public/inbox/demo-podcast.md"                                "Demo Podcast"
+    render_template "${TEMPLATES}/todo-summary-template.md"    "${VAULT}/public/inbox/demo-todo-summary-${year}.md"                   "Demo TODO Summary ${year}"
+    render_template "${TEMPLATES}/weekly-template.md"          "${VAULT}/public/inbox/demo-weekly-${today}-to-${week_end}.md"         "Demo Weekly ${today} to ${week_end}"
+    render_template "${TEMPLATES}/archive-template.md"         "${VAULT}/public/archive/demo-completed-project.md"                    "Demo Completed Project"
 
     # 1x1 placeholder PNG.
-    printf '%s' "${DEMO_PNG_B64}" | base64 -d > "${VAULT}/attachments/demo-screenshot.png"
+    printf '%s' "${DEMO_PNG_B64}" | base64 -d > "${VAULT}/public/attachments/demo-screenshot.png"
 
     cat <<EOF
 Demo dataset seeded into ${VAULT}.
 
 Verify it works:
-  okm files demo-                 # list every seeded file
-  okm grep 'demo'                 # spot-check content
-  okm today                       # exercise daily/
-  bash scripts/todo-summary.sh    # exercise cron scanner (stdout only)
-  okm open inbox/demo-meeting-notes.md   # open a seeded note in your editor
+  okm files demo-                          # list every seeded file
+  okm grep 'demo'                          # spot-check content
+  okm today                                # exercise public/daily/
+  bash scripts/todo-summary.sh             # exercise cron scanner (stdout only)
+  okm open public/inbox/demo-meeting-notes.md   # open a seeded note in your editor
 
 Then tear down:
   bash scripts/seed-demo.sh --teardown

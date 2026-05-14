@@ -31,8 +31,8 @@ if [ -z "${OBSIDIAN_VAULT:-}" ]; then
     fi
     unset _km_parent _km_sibling
 fi
-export OBSIDIAN_DAILY_DIR=daily
-export OBSIDIAN_NOTES_DIR=inbox
+export OBSIDIAN_DAILY_DIR=public/daily
+export OBSIDIAN_NOTES_DIR=public/inbox
 
 # --- Note tracking: set before running setup to control vault .gitignore ---
 # Default (true): notes are tracked in git (pair with git-crypt for encryption).

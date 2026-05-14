@@ -9,7 +9,7 @@ setup() {
     COMPRESS_SCRIPT="${PROJECT_ROOT}/scripts/compress-images.py"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
 
-    mkdir -p "${FAKE_VAULT_DIR}/attachments"
+    mkdir -p "${FAKE_VAULT_DIR}/attachments" "${FAKE_VAULT_DIR}/public/inbox" "${FAKE_VAULT_DIR}/public/archive"
 }
 
 has_pillow() {
@@ -23,9 +23,9 @@ has_pillow() {
 }
 
 @test "NOTE_DIRS includes archive and private dirs" {
-    grep -q '"archive"' "${COMPRESS_SCRIPT}"
-    grep -q '"private-daily"' "${COMPRESS_SCRIPT}"
-    grep -q '"private-inbox"' "${COMPRESS_SCRIPT}"
+    grep -q '"public/archive"' "${COMPRESS_SCRIPT}"
+    grep -q '"private/daily"' "${COMPRESS_SCRIPT}"
+    grep -q '"private/inbox"' "${COMPRESS_SCRIPT}"
 }
 
 @test "wikilink update path uses regex-bound matching (re.escape)" {
@@ -41,7 +41,7 @@ img = Image.new('RGB', (10, 10), color='red')
 img.save('${FAKE_VAULT_DIR}/attachments/foo.png')
 img.save('${FAKE_VAULT_DIR}/attachments/super-foo.png')
 "
-    create_vault_file "inbox/note.md" "Two images: ![[foo.png]] and ![[super-foo.png]] both shown."
+    create_vault_file "public/inbox/note.md" "Two images: ![[foo.png]] and ![[super-foo.png]] both shown."
 
     python3 "${COMPRESS_SCRIPT}"
 
@@ -49,7 +49,7 @@ img.save('${FAKE_VAULT_DIR}/attachments/super-foo.png')
     # to super-foo.webp (its own conversion). What matters is the wikilink for
     # super-foo.png is NOT corrupted into super-foo.webp by the foo.png pass —
     # i.e., the file should never end up with `super-foo.webp.png` or the like.
-    run cat "${FAKE_VAULT_DIR}/inbox/note.md"
+    run cat "${FAKE_VAULT_DIR}/public/inbox/note.md"
     assert_output --partial "![[foo.webp]]"
     assert_output --partial "![[super-foo.webp]]"
     refute_output --partial "![[super-foo.webp.png]]"
@@ -65,11 +65,11 @@ img = Image.new('RGB', (10, 10), color='blue')
 img.save('${FAKE_VAULT_DIR}/attachments/cat.png')
 "
     # 'cat.png' is referenced as a wikilink AND appears as a non-link substring.
-    create_vault_file "inbox/note.md" "Pic: ![[cat.png]]. Note: the file cat.png-archive is unrelated."
+    create_vault_file "public/inbox/note.md" "Pic: ![[cat.png]]. Note: the file cat.png-archive is unrelated."
 
     python3 "${COMPRESS_SCRIPT}"
 
-    run cat "${FAKE_VAULT_DIR}/inbox/note.md"
+    run cat "${FAKE_VAULT_DIR}/public/inbox/note.md"
     assert_output --partial "![[cat.webp]]"
     # Body mention of cat.png-archive must be untouched (its filename ends in -archive)
     assert_output --partial "cat.png-archive"
@@ -84,11 +84,11 @@ from PIL import Image
 img = Image.new('RGB', (10, 10), color='green')
 img.save('${FAKE_VAULT_DIR}/attachments/diagram.png')
 "
-    create_vault_file "inbox/note.md" "![alt text](attachments/diagram.png)"
+    create_vault_file "public/inbox/note.md" "![alt text](attachments/diagram.png)"
 
     python3 "${COMPRESS_SCRIPT}"
 
-    run cat "${FAKE_VAULT_DIR}/inbox/note.md"
+    run cat "${FAKE_VAULT_DIR}/public/inbox/note.md"
     assert_output --partial "attachments/diagram.webp"
     refute_output --partial "diagram.png"
 }
@@ -101,11 +101,11 @@ from PIL import Image
 img = Image.new('RGB', (10, 10), color='yellow')
 img.save('${FAKE_VAULT_DIR}/attachments/anno.png')
 "
-    create_vault_file "inbox/note.md" "Annotated: ![[anno.png|My caption]]"
+    create_vault_file "public/inbox/note.md" "Annotated: ![[anno.png|My caption]]"
 
     python3 "${COMPRESS_SCRIPT}"
 
-    run cat "${FAKE_VAULT_DIR}/inbox/note.md"
+    run cat "${FAKE_VAULT_DIR}/public/inbox/note.md"
     assert_output --partial "![[anno.webp|My caption]]"
 }
 
@@ -117,13 +117,13 @@ from PIL import Image
 img = Image.new('RGB', (10, 10), color='red')
 img.save('${FAKE_VAULT_DIR}/attachments/test.png')
 "
-    create_vault_file "inbox/note.md" "Look: ![[test.png]]"
+    create_vault_file "public/inbox/note.md" "Look: ![[test.png]]"
 
     python3 "${COMPRESS_SCRIPT}" --dry-run
 
     [ -f "${FAKE_VAULT_DIR}/attachments/test.png" ]
     ! [ -f "${FAKE_VAULT_DIR}/attachments/test.webp" ]
-    grep -q "test.png" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "test.png" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 @test "conversion replaces original and updates wikilinks" {
@@ -134,14 +134,14 @@ from PIL import Image
 img = Image.new('RGB', (10, 10), color='blue')
 img.save('${FAKE_VAULT_DIR}/attachments/photo.png')
 "
-    create_vault_file "inbox/note.md" "See ![[photo.png]] here"
+    create_vault_file "public/inbox/note.md" "See ![[photo.png]] here"
 
     python3 "${COMPRESS_SCRIPT}"
 
     ! [ -f "${FAKE_VAULT_DIR}/attachments/photo.png" ]
     [ -f "${FAKE_VAULT_DIR}/attachments/photo.webp" ]
-    grep -q "photo.webp" "${FAKE_VAULT_DIR}/inbox/note.md"
-    ! grep -q "photo.png" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "photo.webp" "${FAKE_VAULT_DIR}/public/inbox/note.md"
+    ! grep -q "photo.png" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 @test "keep flag preserves original" {
@@ -182,9 +182,9 @@ from PIL import Image
 img = Image.new('RGB', (10, 10), color='yellow')
 img.save('${FAKE_VAULT_DIR}/attachments/archived-img.png')
 "
-    create_vault_file "archive/old.md" "Image: ![[archived-img.png]]"
+    create_vault_file "public/archive/old.md" "Image: ![[archived-img.png]]"
 
     python3 "${COMPRESS_SCRIPT}"
 
-    grep -q "archived-img.webp" "${FAKE_VAULT_DIR}/archive/old.md"
+    grep -q "archived-img.webp" "${FAKE_VAULT_DIR}/public/archive/old.md"
 }

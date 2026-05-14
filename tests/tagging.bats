@@ -8,19 +8,19 @@ setup() {
 
     OKM="${PROJECT_ROOT}/bin/okm"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
-    export OBSIDIAN_DAILY_DIR="daily"
-    export OBSIDIAN_NOTES_DIR="inbox"
+    export OBSIDIAN_DAILY_DIR="public/daily"
+    export OBSIDIAN_NOTES_DIR="public/inbox"
     export EDITOR="true"
 }
 
 # === okm tags (list all tags) ===
 
 @test "okm tags lists all tags with counts" {
-    create_vault_file "inbox/note1.md" "---
+    create_vault_file "public/inbox/note1.md" "---
 title: Note 1
 tags: [foo, bar]
 ---"
-    create_vault_file "inbox/note2.md" "---
+    create_vault_file "public/inbox/note2.md" "---
 title: Note 2
 tags: [foo, baz]
 ---"
@@ -32,21 +32,21 @@ tags: [foo, baz]
 }
 
 @test "okm tags for a specific note shows its tags" {
-    create_vault_file "inbox/note1.md" "---
+    create_vault_file "public/inbox/note1.md" "---
 title: Note 1
 tags: [alpha, beta]
 ---"
-    run "${OKM}" tags "inbox/note1.md"
+    run "${OKM}" tags "public/inbox/note1.md"
     assert_success
     assert_output --partial "alpha"
     assert_output --partial "beta"
 }
 
 @test "okm tags for note with no tags shows (no tags)" {
-    create_vault_file "inbox/empty.md" "---
+    create_vault_file "public/inbox/empty.md" "---
 title: Empty
 ---"
-    run "${OKM}" tags "inbox/empty.md"
+    run "${OKM}" tags "public/inbox/empty.md"
     assert_success
     assert_output --partial "(no tags)"
 }
@@ -54,34 +54,34 @@ title: Empty
 # === okm tag (add tags) ===
 
 @test "okm tag adds a tag to a note" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 title: Note
 tags: [existing]
 ---"
-    run "${OKM}" tag "inbox/note.md" "newtag"
+    run "${OKM}" tag "public/inbox/note.md" "newtag"
     assert_success
-    grep -q "tags: \[existing, newtag\]" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "tags: \[existing, newtag\]" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 @test "okm tag adds multiple tags" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 title: Note
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md" "a" "b" "c"
+    run "${OKM}" tag "public/inbox/note.md" "a" "b" "c"
     assert_success
-    grep -q "tags: \[a, b, c\]" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "tags: \[a, b, c\]" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 @test "okm tag does not duplicate existing tags" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 title: Note
 tags: [foo]
 ---"
-    run "${OKM}" tag "inbox/note.md" "foo"
+    run "${OKM}" tag "public/inbox/note.md" "foo"
     assert_success
     local count
-    count=$(grep -o "foo" "${FAKE_VAULT_DIR}/inbox/note.md" | wc -l)
+    count=$(grep -o "foo" "${FAKE_VAULT_DIR}/public/inbox/note.md" | wc -l)
     [ "$count" -eq 1 ]
 }
 
@@ -92,11 +92,11 @@ tags: [foo]
 }
 
 @test "okm tag requires at least one tag" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 title: Note
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md"
+    run "${OKM}" tag "public/inbox/note.md"
     assert_failure
     assert_output --partial "tag required"
 }
@@ -104,44 +104,44 @@ tags: []
 # === okm untag (remove tags) ===
 
 @test "okm untag removes a tag from a note" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 title: Note
 tags: [keep, remove]
 ---"
-    run "${OKM}" untag "inbox/note.md" "remove"
+    run "${OKM}" untag "public/inbox/note.md" "remove"
     assert_success
-    grep -q "tags: \[keep\]" "${FAKE_VAULT_DIR}/inbox/note.md"
-    ! grep -q "remove" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "tags: \[keep\]" "${FAKE_VAULT_DIR}/public/inbox/note.md"
+    ! grep -q "remove" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 @test "okm untag removes multiple tags" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 title: Note
 tags: [a, b, c, d]
 ---"
-    run "${OKM}" untag "inbox/note.md" "b" "d"
+    run "${OKM}" untag "public/inbox/note.md" "b" "d"
     assert_success
-    grep -q "tags: \[a, c\]" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "tags: \[a, c\]" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 @test "okm untag all tags leaves empty array" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 title: Note
 tags: [only]
 ---"
-    run "${OKM}" untag "inbox/note.md" "only"
+    run "${OKM}" untag "public/inbox/note.md" "only"
     assert_success
-    grep -q "tags: \[\]" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "tags: \[\]" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 # === okm tagged (search by tag) ===
 
 @test "okm tagged lists notes with a given tag" {
-    create_vault_file "inbox/has-tag.md" "---
+    create_vault_file "public/inbox/has-tag.md" "---
 title: Has Tag
 tags: [target]
 ---"
-    create_vault_file "inbox/no-tag.md" "---
+    create_vault_file "public/inbox/no-tag.md" "---
 title: No Tag
 tags: [other]
 ---"
@@ -162,7 +162,7 @@ tags: [other]
 @test "okm new -t creates note with initial tags" {
     run "${OKM}" new "Tagged Note" -t "foo,bar"
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/tagged-note.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/tagged-note.md"
     [ -f "$file" ]
     grep -q "tags: \[foo, bar\]" "$file"
 }
@@ -170,7 +170,7 @@ tags: [other]
 @test "okm new without -t creates note with empty tags" {
     run "${OKM}" new "Plain Note"
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/plain-note.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/plain-note.md"
     [ -f "$file" ]
     grep -q "tags: \[\]" "$file"
 }
@@ -181,7 +181,7 @@ tags: [other]
     run "${OKM}" capture "some text" -t "extra"
     assert_success
     local found
-    found=$(find "${FAKE_VAULT_DIR}/inbox" -name '*.md' -newer "${FAKE_VAULT_DIR}" | head -1)
+    found=$(find "${FAKE_VAULT_DIR}/public/inbox" -name '*.md' -newer "${FAKE_VAULT_DIR}" | head -1)
     [ -n "$found" ]
     grep -q "tags: \[capture, inbox, extra\]" "$found"
 }
@@ -191,7 +191,7 @@ tags: [other]
 @test "okm spot -t adds extra tags to spotify note" {
     run "${OKM}" spot "https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6" -t "favorite"
     assert_success
-    local file="${FAKE_VAULT_DIR}/inbox/spotify-track-6rqhfgbbkwnb9mlmuqdhg6.md"
+    local file="${FAKE_VAULT_DIR}/public/inbox/spotify-track-6rqhfgbbkwnb9mlmuqdhg6.md"
     [ -f "$file" ]
     grep -q "source/music, favorite" "$file"
 }
@@ -200,10 +200,10 @@ tags: [other]
 
 # B2: okm tagged uses parsed-tag equality, not boundary regex.
 @test "B2: okm tagged 'source' does not match notes tagged 'source/spotify'" {
-    create_vault_file "inbox/exact.md" "---
+    create_vault_file "public/inbox/exact.md" "---
 tags: [source]
 ---"
-    create_vault_file "inbox/hier.md" "---
+    create_vault_file "public/inbox/hier.md" "---
 tags: [source/spotify]
 ---"
     run "${OKM}" tagged "source"
@@ -213,13 +213,13 @@ tags: [source/spotify]
 }
 
 @test "B2: okm tagged 'para' does not match 'para-tag' or 'parameters'" {
-    create_vault_file "inbox/a.md" "---
+    create_vault_file "public/inbox/a.md" "---
 tags: [para-tag]
 ---"
-    create_vault_file "inbox/b.md" "---
+    create_vault_file "public/inbox/b.md" "---
 tags: [parameters]
 ---"
-    create_vault_file "inbox/c.md" "---
+    create_vault_file "public/inbox/c.md" "---
 tags: [para]
 ---"
     run "${OKM}" tagged "para"
@@ -231,7 +231,7 @@ tags: [para]
 
 # N17: regex metacharacters in `okm tagged` are rejected, not interpreted.
 @test "N17: okm tagged '.*' is rejected as invalid (no regex injection)" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: [foo]
 ---"
     run "${OKM}" tagged ".*"
@@ -240,7 +240,7 @@ tags: [foo]
 }
 
 @test "N17: okm tagged 'foo|bar' is rejected as invalid" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: [foo, bar]
 ---"
     run "${OKM}" tagged "foo|bar"
@@ -250,20 +250,20 @@ tags: [foo, bar]
 
 # N10: hierarchical tags don't break the sed delimiter.
 @test "N10: okm tag accepts hierarchical tag 'source/podcast' without sed errors" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md" "source/podcast"
+    run "${OKM}" tag "public/inbox/note.md" "source/podcast"
     assert_success
     refute_output --partial "sed:"
-    grep -q "tags: \[source/podcast\]" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "tags: \[source/podcast\]" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 @test "N10: okm tag round-trips hierarchical tag through tagged" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
-    "${OKM}" tag "inbox/note.md" "source/podcast" >/dev/null
+    "${OKM}" tag "public/inbox/note.md" "source/podcast" >/dev/null
     run "${OKM}" tagged "source/podcast"
     assert_success
     assert_output --partial "note.md"
@@ -271,84 +271,84 @@ tags: []
 
 # N11: no-frontmatter file gets one prepended and the tag added.
 @test "N11: okm tag on a file without frontmatter prepends one and adds the tag" {
-    create_vault_file "inbox/plain.md" "Just plain text"
-    run "${OKM}" tag "inbox/plain.md" "newtag"
+    create_vault_file "public/inbox/plain.md" "Just plain text"
+    run "${OKM}" tag "public/inbox/plain.md" "newtag"
     assert_success
-    grep -q "^---$" "${FAKE_VAULT_DIR}/inbox/plain.md"
-    grep -q "tags: \[newtag\]" "${FAKE_VAULT_DIR}/inbox/plain.md"
-    grep -q "^Just plain text$" "${FAKE_VAULT_DIR}/inbox/plain.md"
+    grep -q "^---$" "${FAKE_VAULT_DIR}/public/inbox/plain.md"
+    grep -q "tags: \[newtag\]" "${FAKE_VAULT_DIR}/public/inbox/plain.md"
+    grep -q "^Just plain text$" "${FAKE_VAULT_DIR}/public/inbox/plain.md"
 }
 
 @test "N11: okm untag on a file without frontmatter is a no-op (not a fake success)" {
-    create_vault_file "inbox/plain.md" "Just plain text"
-    run "${OKM}" untag "inbox/plain.md" "anything"
+    create_vault_file "public/inbox/plain.md" "Just plain text"
+    run "${OKM}" untag "public/inbox/plain.md" "anything"
     assert_success
     assert_output --partial "No tags to remove"
-    [ "$(cat "${FAKE_VAULT_DIR}/inbox/plain.md")" = "Just plain text" ]
+    [ "$(cat "${FAKE_VAULT_DIR}/public/inbox/plain.md")" = "Just plain text" ]
 }
 
 # B3: block-style YAML tags are refused, not silently corrupted.
 @test "B3: okm tag refuses block-style YAML tags with a clear error" {
-    create_vault_file "inbox/block.md" "---
+    create_vault_file "public/inbox/block.md" "---
 tags:
   - foo
   - bar
 ---"
-    run "${OKM}" tag "inbox/block.md" "newtag"
+    run "${OKM}" tag "public/inbox/block.md" "newtag"
     assert_failure
     assert_output --partial "block-style"
 }
 
 @test "B3: okm untag refuses block-style YAML tags with a clear error" {
-    create_vault_file "inbox/block.md" "---
+    create_vault_file "public/inbox/block.md" "---
 tags:
   - foo
 ---"
-    run "${OKM}" untag "inbox/block.md" "foo"
+    run "${OKM}" untag "public/inbox/block.md" "foo"
     assert_failure
     assert_output --partial "block-style"
 }
 
 # B4 + N23: invalid characters rejected at validation time.
 @test "B4: okm tag rejects tag containing space" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md" "machine learning"
+    run "${OKM}" tag "public/inbox/note.md" "machine learning"
     assert_failure
     assert_output --partial "Invalid tag"
 }
 
 @test "B4/N23: okm tag rejects tag containing ]" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md" "evil]"
+    run "${OKM}" tag "public/inbox/note.md" "evil]"
     assert_failure
     assert_output --partial "Invalid tag"
 }
 
 @test "B4: okm tag rejects tag containing :" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md" "foo:bar"
+    run "${OKM}" tag "public/inbox/note.md" "foo:bar"
     assert_failure
     assert_output --partial "Invalid tag"
 }
 
 @test "B4: okm tag rejects tag containing comma" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: []
 ---"
-    run "${OKM}" tag "inbox/note.md" "foo,bar"
+    run "${OKM}" tag "public/inbox/note.md" "foo,bar"
     assert_failure
     assert_output --partial "Invalid tag"
 }
 
 # N21: body `---...---` blocks are not parsed as frontmatter.
 @test "N21: okm tags <note> reads only the first frontmatter block" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: [real]
 ---
 Body content.
@@ -356,14 +356,14 @@ Body content.
 ---
 tags: [body-fake]
 ---"
-    run "${OKM}" tags "inbox/note.md"
+    run "${OKM}" tags "public/inbox/note.md"
     assert_success
     assert_output --partial "real"
     refute_output --partial "body-fake"
 }
 
 @test "N21: okm tag preserves body --- blocks verbatim" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: [original]
 ---
 # Body
@@ -375,21 +375,21 @@ tags: [example-in-body]
 ---
 
 End."
-    run "${OKM}" tag "inbox/note.md" "added"
+    run "${OKM}" tag "public/inbox/note.md" "added"
     assert_success
     # Frontmatter tags updated:
-    grep -q "^tags: \[original, added\]$" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "^tags: \[original, added\]$" "${FAKE_VAULT_DIR}/public/inbox/note.md"
     # Body example preserved (still appears in the file):
-    grep -q "^tags: \[example-in-body\]$" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q "^tags: \[example-in-body\]$" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }
 
 # N22: tags starting with `-` work safely thanks to `grep --`.
 @test "N22: okm tag accepts tag starting with - without grep flag-injection error" {
-    create_vault_file "inbox/note.md" "---
+    create_vault_file "public/inbox/note.md" "---
 tags: [foo]
 ---"
-    run "${OKM}" tag "inbox/note.md" "-leading-dash-tag"
+    run "${OKM}" tag "public/inbox/note.md" "-leading-dash-tag"
     assert_success
     refute_output --partial "grep:"
-    grep -q -- "tags: \[foo, -leading-dash-tag\]" "${FAKE_VAULT_DIR}/inbox/note.md"
+    grep -q -- "tags: \[foo, -leading-dash-tag\]" "${FAKE_VAULT_DIR}/public/inbox/note.md"
 }

@@ -33,19 +33,19 @@ _run_install_direnv() {
         SCRIPT_DIR="$_ID_SCRIPT"
         PATH="$_ID_STUB:$PATH"
         touch "$_ID_SCRIPT/.envrc"
-        eval "$(sed -n "/^install_direnv()/,/^}/p" "$_ID_PROJ/setup-km.sh")"
+        eval "$(sed -n "/^install_direnv()/,/^}/p" "$_ID_PROJ/scripts/setup-km.sh")"
         install_direnv
     '
 }
 
 # --- Static checks (no subprocess needed) ---
 
-@test "install_direnv function exists in setup-km.sh" {
-    grep -q '^install_direnv()' "${PROJECT_ROOT}/setup-km.sh"
+@test "install_direnv function exists in scripts/setup-km.sh" {
+    grep -q '^install_direnv()' "${PROJECT_ROOT}/scripts/setup-km.sh"
 }
 
 @test "setup-km.sh calls install_direnv in the install steps section" {
-    sed -n '/^# --- Install steps ---/,$p' "${PROJECT_ROOT}/setup-km.sh" \
+    sed -n '/^# --- Install steps ---/,$p' "${PROJECT_ROOT}/scripts/setup-km.sh" \
         | grep -q 'install_direnv'
 }
 
@@ -56,7 +56,7 @@ _run_install_direnv() {
 @test "install_direnv only writes to ~/.bashrc not ~/.zshrc" {
     # Extract install_direnv body and check it targets only ~/.bashrc
     local fn_body
-    fn_body="$(sed -n '/^install_direnv()/,/^}/p' "${PROJECT_ROOT}/setup-km.sh")"
+    fn_body="$(sed -n '/^install_direnv()/,/^}/p' "${PROJECT_ROOT}/scripts/setup-km.sh")"
     echo "$fn_body" | grep -q '\.bashrc'
     ! echo "$fn_body" | grep -q '\.zshrc'
 }

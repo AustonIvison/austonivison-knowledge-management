@@ -24,7 +24,7 @@ setup() {
     cp "${PROJECT_ROOT}/scripts/todo-summary.sh" "${TEST_TEMP_DIR}/todo-summary.sh"
     sed -i "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"${TEST_TEMP_DIR}\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
     sed -i "s|^PROJECT_DIR=.*|PROJECT_DIR=\"${FAKE_PROJECT_DIR}\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
-    sed -i "s|^OUTPUT_FILE=.*|OUTPUT_FILE=\"${FAKE_PROJECT_DIR}/inbox/todo-summary-\${YEAR}.md\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
+    sed -i "s|^OUTPUT_FILE=.*|OUTPUT_FILE=\"${FAKE_PROJECT_DIR}/public/inbox/todo-summary-\${YEAR}.md\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
     chmod +x "${TEST_TEMP_DIR}/todo-summary.sh"
 }
@@ -95,13 +95,13 @@ setup() {
     create_project_file "job.sh" "# TODO: cron test item"
     run bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     assert_success
-    [ -f "${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md" ]
+    [ -f "${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md" ]
 }
 
 @test "cron command output file contains PARA structure" {
     create_project_file "job.sh" "# TODO: cron para test"
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     grep -q "#### Projects" "$file"
     grep -q "#### Areas" "$file"
     grep -q "#### Resources" "$file"
@@ -110,7 +110,7 @@ setup() {
 
 @test "cron command output file has correct frontmatter tags" {
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     grep -q 'tags: \[todo-summary, para, automated\]' "$file"
 }
 
@@ -119,7 +119,7 @@ setup() {
 @test "same-day re-run replaces today's section" {
     create_project_file "first.sh" "# TODO: first run item"
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
 
     create_project_file "second.sh" "# TODO: second run item"
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
@@ -136,17 +136,17 @@ setup() {
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     local count
-    count=$(find "${FAKE_PROJECT_DIR}/inbox" -name 'todo-summary-*.md' | wc -l)
+    count=$(find "${FAKE_PROJECT_DIR}/public/inbox" -name 'todo-summary-*.md' | wc -l)
     [ "$count" -eq 1 ]
 }
 
 @test "later cron run picks up items added since earlier run" {
     create_project_file "morning.sh" "# TODO: morning task"
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
-    local file="${FAKE_PROJECT_DIR}/inbox/todo-summary-$(date +%Y).md"
+    local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
     grep -q "morning task" "$file"
 
-    create_vault_file "inbox/new-note.md" "- [ ] added after morning scan"
+    create_vault_file "public/inbox/new-note.md" "- [ ] added after morning scan"
     create_project_file "afternoon.sh" "# FIXME: afternoon bugfix"
 
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
