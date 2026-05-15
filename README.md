@@ -569,3 +569,5 @@ Port slow Bash/Python utilities (fuzz harness, `okm audit`, large TODO scans) to
 - [`docs/skills/README.md`](docs/skills/README.md) — AI skills library
 - [`scripts/README.md`](scripts/README.md) — cron job docs
 - [`scripts/setup-km.sh`](scripts/setup-km.sh) — canonical source for versions and defaults
+- 
+https://www.kernel.sh/ we build crazy fast, open source infra for them to access the internet
