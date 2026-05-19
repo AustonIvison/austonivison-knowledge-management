@@ -8,6 +8,8 @@
 " Project additions: TODO/FIXME/BUG highlighting (yellow/orange/red),
 " matching the Neovim todo-comments.nvim setup.
 
+set nocompatible
+
 if filereadable(expand('~/.vimrc'))
   source ~/.vimrc
 endif
