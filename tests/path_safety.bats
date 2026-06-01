@@ -147,3 +147,65 @@ tags: []
     ensure_git_repo "$target"
     [ "$(git -C "$target" config --get core.symlinks)" = "false" ]
 }
+
+# === bin/vim: relative ./bin in PATH must not cause self-loop ===
+#
+# Bug: the original fix used `grep -vxF "${KM_ROOT}/bin"` to strip the project
+# bin from PATH before looking up the real vim. This only matched the exact
+# absolute-path string. If PATH also contained `./bin` (a relative entry that
+# resolves to the same directory when CWD == project root), `command -v vim`
+# still found ./bin/vim — the wrapper itself — and `exec` looped infinitely.
+#
+# Fix: canonical-path comparison via `cd && pwd -P` catches absolute paths,
+# relative paths, and symlinks that all resolve to KM_ROOT/bin.
+
+@test "bin/vim: canonical-path strip removes ./bin when it resolves to KM_ROOT/bin" {
+    local km_root="${TEST_TEMP_DIR}/fake-km"
+    mkdir -p "${km_root}/bin"
+    cp "${PROJECT_ROOT}/bin/vim" "${km_root}/bin/vim"
+
+    # PATH contains both the absolute and relative forms pointing at the wrapper.
+    local test_path="${km_root}/bin:./bin:/usr/bin:/bin"
+
+    local resolved
+    resolved=$(
+        cd "$km_root"
+        KM_ROOT="$km_root"
+        _safe_path="$(
+            printf '%s' "$test_path" | tr ':' '\n' | while IFS= read -r _p; do
+                _canon="$(cd -- "$_p" 2>/dev/null && pwd -P)"
+                [ "$_canon" != "${KM_ROOT}/bin" ] && printf '%s\n' "$_p"
+            done | paste -sd:
+        )"
+        PATH="${_safe_path}" command -v vim 2>/dev/null
+    )
+
+    # Must not resolve to the project wrapper (either form).
+    [[ "$resolved" != "${km_root}/bin/vim" ]]
+    [[ "$resolved" != "./bin/vim" ]]
+    # Must resolve to an executable outside the project bin.
+    [[ -x "$resolved" ]]
+}
+
+@test "bin/vim: old grep-only strip leaves ./bin self-loop intact (documents regressed behaviour)" {
+    # This test demonstrates WHY the fix was needed: the old single grep-vxF
+    # approach fails to strip the relative ./bin entry, causing vim to resolve
+    # to the wrapper itself and loop.
+    local km_root="${TEST_TEMP_DIR}/fake-km"
+    mkdir -p "${km_root}/bin"
+    cp "${PROJECT_ROOT}/bin/vim" "${km_root}/bin/vim"
+
+    local test_path="${km_root}/bin:./bin:/usr/bin:/bin"
+
+    local resolved_old
+    resolved_old=$(
+        cd "$km_root"
+        KM_ROOT="$km_root"
+        # Old (broken) approach: grep-only strip.
+        _safe_path_old="$(printf '%s' "$test_path" | tr ':' '\n' | grep -vxF "${KM_ROOT}/bin" | paste -sd:)"
+        PATH="${_safe_path_old}" command -v vim 2>/dev/null
+    )
+
+    # Old approach resolves to the wrapper — this is the bug.
+    [[ "$resolved_old" = "${km_root}/bin/vim" || "$resolved_old" = "./bin/vim" ]]
+}

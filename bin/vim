@@ -8,6 +8,11 @@
 # config/vim/vimrc sources ~/.vimrc internally, so personal settings still apply.
 
 KM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-_safe_path="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vxF "${KM_ROOT}/bin" | paste -sd:)"
+_safe_path="$(
+  printf '%s' "$PATH" | tr ':' '\n' | while IFS= read -r _p; do
+    _canon="$(cd -- "$_p" 2>/dev/null && pwd -P)"
+    [ "$_canon" != "${KM_ROOT}/bin" ] && printf '%s\n' "$_p"
+  done | paste -sd:
+)"
 _vim_bin="$(PATH="${_safe_path}" command -v vim 2>/dev/null)" || { printf 'vim not found in PATH\n' >&2; exit 127; }
 exec "${_vim_bin}" -u "${KM_ROOT}/config/vim/vimrc" "$@"
