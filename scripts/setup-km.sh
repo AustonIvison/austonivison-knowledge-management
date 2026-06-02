@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Setting up all tools for my knowledge management
+# Install and configure all tools for the knowledge management vault.
 
 set -euo pipefail
 

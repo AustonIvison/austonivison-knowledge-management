@@ -26,17 +26,35 @@ Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI
 
 ---
 
+## Prerequisites
+
+Before running setup, ensure the following are available on your machine:
+
+| Requirement | Notes |
+|---|---|
+| `git` | `git --version` |
+| `curl` | `curl --version` |
+| `flatpak` | `flatpak --version` — needed for Obsidian |
+| `sudo` access | `setup-km.sh` installs apt packages |
+| GitHub account | For forking and syncing your vault |
+
+**Platform:** Debian/Ubuntu only (apt + Flatpak). x86_64 or arm64.
+
+---
+
 ## Setup
 
-> **Fork first.** Fork and rename to `{your-github-handle}-knowledge-management`. Clone *your fork*, not upstream, so `okm sync` pushes to your private repo.
+> **Fork first.** On GitHub: fork this repo, then go to your fork's **Settings → General → Repository name** and rename it to `{your-github-handle}-knowledge-management`. Clone *your fork*, not this repo, so `okm sync` pushes to your private copy.
 
 ```bash
 git clone --recurse-submodules <your-fork-url> ~/projects/knowledge-management
 cd ~/projects/knowledge-management
-export OBSIDIAN_VAULT="$HOME/my-vault"   # optional; default: sibling dir
+export OBSIDIAN_VAULT="$HOME/my-vault"   # optional; default: repo root
 bash scripts/setup-km.sh && source env.sh && bash scripts/verify-km.sh
 bash tests/run_all.sh
 ```
+
+> **Note:** Run `bash scripts/setup-km.sh` before `direnv allow .` — setup installs `direnv` itself. Running `direnv allow .` first will fail if `direnv` is not yet on your PATH.
 
 Setup prompt: **Track notes in git?** (default: yes). Pre-set with `KM_TRACK_NOTES=true|false`. Logs at `~/.local/log/setup-km-*.log`.
 
@@ -284,7 +302,7 @@ git add .gitattributes && git commit -m "configure git-crypt"
 |---|---|---|
 | **v0** | ✅ shipped | Core vault CLI, privacy boundary, hardened input |
 | **v1** | 🟡 in design | Fork-safety, edge-case bugs, tagging gaps |
-| **v2** | 🔵 planned | Media ingest, macOS, encryption, performance |
+| **v2** | 🔵 planned | Media ingest, macOS, encryption, performance — see [`roadmap-features.md`](roadmap-features.md) |
 | **v3** | 🔵 planned | Portable Vault Specification (PVS) |
 
 ### v0 — shipped
@@ -558,11 +576,11 @@ Port slow Bash/Python utilities (fuzz harness, `okm audit`, large TODO scans) to
 - [x] **Nested vault removed** — accidentally-committed `awsaavedra-knowledge-management/` subfolder (a default Obsidian init) removed from HEAD and history.
 - [x] **`config/mpv/mpv.conf` hardcoded path removed** — was `/home/user/workspace/knowledge-management/attachments`; replaced with blank + comment instructing users to set their own path.
 - [x] **Stray personal URL removed from README** — trailing `kernel.sh` note removed from `See Also` section.
-- [ ] **`settings.local.json` scrubbed from history** — commit `93cdf4f` added `.claude/settings.local.json` with `/home/user/workspace/...` paths before it was gitignored. Run: `git filter-repo --invert-paths --path .claude/settings.local.json` then force-push both remotes.
-- [ ] **README prerequisites section** — add explicit list of what must exist before running `setup-km.sh`: `git`, `curl`, `flatpak`, `sudo` access, GitHub account.
-- [ ] **README fork-rename clarification** — "Fork and rename" step should explain *how*: GitHub → Settings → Repository name.
-- [ ] **README direnv sequencing** — warn users not to run `direnv allow .` before `setup-km.sh` (direnv may not be installed yet).
-- [ ] **`scripts/setup-km.sh` comment** — first-line comment says "my knowledge management"; make it generic.
+- [x] **`settings.local.json` scrubbed from history** — commit `93cdf4f` added `.claude/settings.local.json` with `/home/user/workspace/...` paths before it was gitignored. Removed via `git filter-repo --invert-paths`; both remotes force-pushed.
+- [x] **README prerequisites section** — added table of `git`, `curl`, `flatpak`, `sudo`, GitHub account before Setup.
+- [x] **README fork-rename clarification** — now explains GitHub Settings → General → Repository name.
+- [x] **README direnv sequencing** — callout added: run `setup-km.sh` before `direnv allow .`.
+- [x] **`scripts/setup-km.sh` comment** — changed "my knowledge management" to generic description.
 - [ ] **Identity** — commits carry the author name. Intentional if open-sourcing under your own name; otherwise rewrite with `git filter-repo --name-callback` / `--email-callback`.
 - [ ] **Force-push** — after all history rewrites, force-push to both `origin` and `upstream` (`git@github.com:awsaavedra/knowledge-management.git`).
 
