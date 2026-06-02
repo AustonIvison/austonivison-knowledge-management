@@ -1,0 +1,29 @@
+# Zone registry — maps PARA directories to agent ownership rules.
+# ZoneViolationError is raised by vault/adapter.py on any write outside an agent's owned zones.
+# CRITICAL: private/ must always have owners: [] and readable_by: [] — hard AI boundary.
+
+zones:
+  inbox:
+    path: "public/inbox"
+    owners: [researcher, tagger, linker, synthesizer]
+    readable_by: [orchestrator]
+
+  archive:
+    path: "public/archive"
+    owners: []                        # read-only: completed notes, no agent may write here
+    readable_by: [researcher, orchestrator, synthesizer, tagger, linker]
+
+  daily:
+    path: "public/daily"
+    owners: []                        # read-only: daily notes are human-authored only
+    readable_by: [researcher, orchestrator]
+
+  loom_logs:
+    path: "public/loom-logs"
+    owners: [orchestrator, researcher, synthesizer, tagger, linker]
+    readable_by: []
+
+  private_blocked:
+    path: "private"
+    owners: []                        # NO agent may write or read private/
+    readable_by: []

@@ -1,0 +1,45 @@
+# Loom config for awsaavedra-knowledge-management (PARA vault)
+# Do not store API keys here. Use ANTHROPIC_API_KEY in .env.local / environment.
+#
+# Run from vault root: loom run "prompt" --vault /path/to/this/repo
+
+orchestrator:
+  model: "anthropic/claude-sonnet-4-6"
+  temperature: 0.3
+  max_tokens: 4000
+  max_iterations: 10
+
+agents:
+  researcher:
+    model: "anthropic/claude-haiku-4-5-20251001"
+    tools: [vault_search, web_search]
+    max_tokens: 2000
+  tagger:
+    model: "ollama/gemma4:latest"
+    tools: [frontmatter_update]
+    max_tokens: 500
+  linker:
+    model: "ollama/gemma4:latest"
+    tools: [link_extract, link_insert]
+    max_tokens: 500
+  synthesizer:
+    model: "anthropic/claude-sonnet-4-6"
+    tools: [vault_read, vault_write]
+    max_tokens: 4000
+
+vault:
+  root: ".."                              # one level up from .loom/ = repo root
+  vault_name: "awsaavedra-knowledge-management"
+  inbox_dir: "public/inbox"              # researcher, tagger, linker write here
+  notes_dir: "public/archive"            # read-only: completed/archived notes
+  wiki_dir: "public/inbox/wiki"          # synthesizer output (sub-dir of inbox zone)
+  shared_dir: "public/loom-logs"         # orchestrator ledger (top-level, not inside inbox)
+  ledger_path: "public/loom-logs/task_ledger.md"
+  constitution_path: "ORCHESTRATOR.md"
+  zone_registry: ".loom/zone_registry.yaml"
+  vault_mode: "direct"                   # PARA vault uses direct FS; no Obsidian CLI required
+
+bifrost:
+  base_url: "http://localhost:8080"
+  timeout_seconds: 120
+  retry_attempts: 3
