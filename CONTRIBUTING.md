@@ -48,3 +48,27 @@ Open a GitHub issue with:
 - Bash: `set -euo pipefail`, quote variables, prefer `[[ ]]` over `[ ]`. Match the style of `bin/okm` and the existing scripts.
 - Markdown: short sentences, tables for structured data, no filler.
 - No new external runtime dependencies without discussion — offline-first is a hard constraint.
+
+## Contributing features from a personal fork
+
+Forking for personal vault use creates tension with contributing back — your fork holds private notes, but PRs should only carry code changes.
+
+| Approach | How it works | Trade-offs |
+|---|---|---|
+| **A — Contribution fork** | Create a second, code-only fork at `{handle}-km-contrib`. Clone it without vault data. Push feature branches there; PR to upstream. | Clean separation. Requires managing two forks. |
+| **B — Throwaway branch** | In your personal fork, create a feature branch from upstream's `main` (no vault commits in history). Push it to a `contrib/` remote pointing at upstream. | One repo, but branch discipline required. |
+| **C — `okm port` topology** (v1) | After `okm port`, `origin` = private vault fork, `upstream` = public OSS. Feature branches go to a third throwaway fork and PR to `upstream/main`. | Cleanest long-term; requires `okm port` to ship first. |
+| **D — Codespace / devcontainer** | Contribute inside a GitHub Codespace that clones the public repo with no vault. `$OBSIDIAN_VAULT` points to an empty test vault. | No vault data ever leaves the machine. |
+
+**Recommended workflow (today):**
+
+```bash
+git fetch upstream
+git checkout -b feature/foo upstream/main
+bash tests/run_all.sh
+git remote add contrib git@github.com:{handle}-km-contrib/knowledge-management.git
+git push contrib feature/foo
+# PR: contrib/feature/foo → upstream/main
+```
+
+**Invariant:** vault data (`public/daily/`, `public/inbox/`, `public/archive/`) must never appear in any commit on a PR branch. `okm audit --code-only` checks this.

@@ -6,7 +6,7 @@
 
 Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI — file-native, offline-first, continuously tested. Treats notes like code: plain Markdown, local files, terminal workflows, composable CLI. AI is optional and layered on top.
 
-**Design principles:** instant startup; fresh local indexing; composable CLI (pipes, JSON, CI); non-destructive by default; no lock-in; small memorable command surface; editor/toolchain interop; local-first; lightweight; **ejectable** — every note readable with `cat`/`grep`/any CommonMark renderer, vault survives Obsidian disappearing (see [PVS](#portable-vault-specification-pvs-v10)).
+**Design principles:** instant startup; fresh local indexing; composable CLI (pipes, JSON, CI); non-destructive by default; no lock-in; small memorable command surface; editor/toolchain interop; local-first; lightweight; **ejectable** — every note readable with `cat`/`grep`/any CommonMark renderer, vault survives Obsidian disappearing (see [PVS](docs/PVS.md)).
 
 ---
 
@@ -59,14 +59,7 @@ bash scripts/seed-demo.sh --teardown   # clean up
 **Vim:** `EDITOR=vim okm open public/inbox/demo-meeting-notes.md` — expect green `PUBLIC PARA · inbox` statusline. (`bin/vim` wraps `vim -u config/vim/vimrc`; `bin/` is first on `$PATH` via `env.sh` so `vim` loads project config without touching `~/.vimrc`.)
 **Private side test:** `nvim private/inbox/demo-private.md` → red `⚠ PRIVATE PARA` banner.
 
-Seeded files:
-
-| Folder | Files |
-|---|---|
-| `public/daily/` | `demo-YYYY-MM-DD.md` |
-| `public/inbox/` | `demo-meeting-notes.md`, `demo-capture.md`, `demo-yt-example.md`, `demo-spotify-episode.md`, `demo-spotify-track.md`, `demo-podcast.md`, `demo-todo-summary-YYYY.md`, `demo-weekly-*.md` |
-| `public/attachments/` | `demo-screenshot.png` (1×1 placeholder) |
-| `public/archive/` | `demo-completed-project.md` |
+Seeded files: `public/daily/demo-YYYY-MM-DD.md` · `public/inbox/demo-{meeting-notes,capture,yt-example,spotify-{episode,track},podcast,todo-summary-YYYY,weekly-*}.md` · `public/attachments/demo-screenshot.png` · `public/archive/demo-completed-project.md`
 
 ---
 
@@ -82,7 +75,6 @@ Seeded files:
 - **Search:** `okm grep <pattern>` (content) or `okm files [pattern]` (paths)
 - **Sync:** `okm sync [message]` — default commit message: `vault sync YYYY-MM-DD HH:MM:SS`
 - **Test before merge:** `bash tests/run_all.sh`
-- **Commit conventions:** one logical change per commit; ask before destructive ops or scope creep
 - **Auto-activation:** `direnv allow .` (repo includes `.envrc`)
 
 ---
@@ -94,24 +86,14 @@ Seeded files:
 ├── env.sh
 ├── bin/okm                         # vault CLI
 ├── config/nvim/                    # NVIM_APPNAME=km → ~/.config/km/
-├── config/lazygit/ / config/mpv/
+├── config/{lazygit,mpv,vim}/
 ├── docs/ai-instructions.md         # AI assistant rules
-├── docs/skills/                    # AI skills library
-│   ├── README.md
-│   ├── argumentation.md
-│   ├── code-review.md
-│   ├── debug.md
-│   ├── delegation.md
-│   ├── diagnostic.md
-│   ├── distill-prompt.md
-│   ├── research.md
-│   ├── security.md
-│   ├── software-engineering.md
-│   └── transcripts.md
+├── docs/skills/                    # AI skills (argumentation, debug, research, …)
+├── docs/PVS.md                     # Portable Vault Specification
+├── docs/DESIGN_NOTES.md            # N/B code index, fork-safety design
 ├── scripts/setup-km.sh             # install and configure
 ├── scripts/verify-km.sh            # post-install checks
-├── scripts/todo-summary.sh         # PARA TODO scanner (cron)
-├── scripts/weekly-tasks.sh         # weekly summary (cron)
+├── scripts/{todo-summary,weekly-tasks}.sh   # cron scanners
 ├── scripts/compress-images.py      # PNG/JPG → WebP (cron)
 ├── tests/                          # BATS suite
 └── venv/                           # Python venv (gitignored)
@@ -123,13 +105,9 @@ Seeded files:
 │   ├── attachments/ # Resources — images, PDFs
 │   └── archive/     # Archive — completed notes
 └── private/         # Mirror of public/; AI-private; local-only
-    ├── daily/
-    ├── inbox/
-    ├── attachments/
-    └── archive/
 ```
 
-Vault follows [PARA](https://fortelabs.com/blog/para/). `private/{daily,inbox,attachments,archive}/` mirror each public folder.
+Vault follows [PARA](https://fortelabs.com/blog/para/). All agent/loom output belongs under `public/` in PARA. `private/` mirrors each public folder.
 
 ---
 
@@ -212,9 +190,8 @@ Tools: yt-dlp, spotdl, whisperX (large-v3-turbo), ffmpeg, mpv (`s` key → scree
 | `daily-template.md` | `okm today` |
 | `note-template.md` | `okm new` |
 | `capture-template.md` | `okm capture` |
-| `yt-template.md` | `okm yt` (planned) |
+| `yt-template.md` / `podcast-template.md` | `okm yt` / `okm pod` (planned) |
 | `spotify-episode-template.md` / `spotify-track-template.md` | `okm spot` |
-| `podcast-template.md` | `okm pod` (planned) |
 | `todo-summary-template.md` / `weekly-template.md` | cron scripts |
 | `archive-template.md` | manual |
 
@@ -230,14 +207,7 @@ TODO → PARA: `TODO/FIXME/HACK/XXX` = Projects, `- [ ]` = Areas, `REVIEW:` = Re
 | 07:00, 12:00, 15:00 | `weekly-tasks.sh --output` | `public/inbox/weekly-DATE-to-DATE.md` |
 | 17:00 | `compress-images.py` | PNG/JPG → WebP |
 
-```bash
-# Replace $KM with project path
-3 7 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
-3 12 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
-3 15 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
-0 7,12,15 * * * /usr/bin/bash $KM/scripts/weekly-tasks.sh --output
-0 17 * * *      $KM/venv/bin/python $KM/scripts/compress-images.py
-```
+Crontab entries: see [`scripts/README.md`](scripts/README.md).
 
 ---
 
@@ -286,240 +256,10 @@ git add .gitattributes && git commit -m "configure git-crypt"
 |---|---|---|
 | **v0** | ✅ shipped | Core vault CLI, privacy boundary, hardened input |
 | **v1** | 🟡 in design | Fork-safety, edge-case bugs, tagging gaps |
-| **v2** | 🔵 planned | Media ingest, macOS, encryption, performance — see [`roadmap-features.md`](roadmap-features.md) |
+| **v2** | 🔵 planned | Media ingest, macOS, encryption, performance |
 | **v3** | 🔵 planned | Portable Vault Specification (PVS) |
 
-### v0 — shipped
-
-| Cluster | Summary |
-|---|---|
-| **Tagging** | Boundary regex, injection-safe dedup, frontmatter-less handling, hierarchical tags; block-style YAML read (B3); HR false-positive guard (N30); permission-preserving write (N31) |
-| **Privacy** | Vault `.gitignore`; `private/` exclusion; `okm audit`; fork-safety docs |
-| **Path safety** | `okm open`/`sync` vault-boundary checks; `list_notes` excludes `.git/` |
-| **Input validation** | YAML escaping; slug fail-closed; Spotify ID validation; `validate_tag` on flags |
-| **Templates** | Single-source placeholder substitution across all note types |
-| **Fuzz gate** | BATS property-test harness (Unicode/quotes/slashes/newlines/empty/long) |
-| **Test/CI** | 280+ BATS tests isolated via `FAKE_VAULT_DIR`; CI green on main |
-
-**Regression guard:** don't break these in v1+: 280+ BATS tests via `FAKE_VAULT_DIR` + fake `$HOME` · `scripts/lib/scan.sh` shared library · idempotent `scripts/setup-km.sh`/`okm new/today/spot` · `scripts/verify-km.sh` exit-code discipline · `docs/skills/`/`private/` privacy boundary · minimal correct CI.
-
-### v1 — in design
-
-Full specs + reproduction steps: `tests/v1_spec.bats`.
-
-| Item | Code |
-|---|---|
-| **Fork-safety** (`okm port`) | See [Fork-safety](#fork-safety-architecture) |
-| **Contribution workflow** | See [Contributing Features](#contributing-features) |
-| `okm sync` extension check | — |
-| `okm private <subcmd>` | — |
-| `okm audit --json` + pre-commit hook | — |
-| `okm rename-tag` / `okm tags --json` | — |
-| `-t` on `okm today` | — |
-| `okm spot` metadata fetch + URL escape | N9 |
-| `KM_TRACK_NOTES` default unification | F6 |
-| macOS support | — |
-| `okm crypt init` | — |
-| README dual-mode diagram | N6 |
-| `verify-km.sh` direnv check | N8 |
-| Polish: log rotation, `sync -m`, `okm version`, decouple cron tests | N7, F7 |
-
-### v2 — planned
-
-| Item | Notes |
-|---|---|
-| `okm yt` / `okm pod` | YouTube transcript; local audio → whisperX |
-| `okm distill` | AI summary (Claude + Ollama backends) |
-| `okm online`/`offline` | Network-state toggle |
-| HuggingFace token | pyannote speaker diarization |
-| fzf tag picker / private PARA mirror | |
-| `#inline-tags` scanning | **Defer to v3** — Tier-1 or Tier-2? |
-| Tag aliasing | Name equivalence (orthogonal to `aliases:` field) |
-| ~~Hierarchical tags~~ | **Superseded by PVS §2** (flat-only) |
-| **Rust mirror** | Port slow utils after patterns stabilize |
-
-### v3 — planned (PVS)
-
-| Item | Notes |
-|---|---|
-| Standard markdown links | Migrate `[[wikilinks]]` → `[text](path.md)` in templates/`seed-demo.sh` |
-| Frontmatter schema + `VAULT_SCHEMA.md` | Allowlist: `title date modified tags aliases status type source` |
-| `okm audit` PVS rules | Wikilinks, undoc'd keys, query blocks without snapshots, Tier-2 without fallback |
-| Tier-2 artifact policy | `.canvas`/`.base`/`.excalidraw.md` need Tier-1 export or fallback note |
-| Query block snapshots | Static tables paired with queries; script regenerates on schedule |
-| `#inline-tags` + hierarchical tags | Resolve v2 deferrals; PVS §2 currently flat-only |
-
-**Crosswalk:** v0 templates Tier-1 compliant. v1 block YAML compatible with PVS §2. v2 hierarchical tags superseded by §2. Tag aliasing orthogonal.
-
----
-
-## Fork-safety architecture
-
-Structural goal: accidental pushes to upstream impossible. Two topologies under evaluation.
-
-### Approach A — asymmetric remotes
-
-`origin` → private user repo · `upstream` → public OSS (fetch-only, push URL `DISABLED`) · pre-push hook blocklists upstream · `okm sync` refuses if `origin` matches upstream.
-
-**`okm port <handle> [--public] [--no-push]`:** `gh` auth + `okm audit` → create private repo → rename/disable upstream → add new origin → install hook → push.
-
-*Pro:* minimal delta from v0. *Con:* vault shares git history with app; PRs need throwaway fork.
-
-### Approach B — two-repo split
-
-**B1 (submodule):** private repo contains public app as `app/` submodule; vault in `vault/`.
-**B2 (side-by-side):** public repo for code; `OBSIDIAN_VAULT` env var points to separate private vault.
-
-*Pro:* no shared history; clean fork/PR; B2 is near-zero code change. *Con:* must extract vault dirs; `okm sync` semantics change.
-
-**Decision:** A if minimal change acceptable. B2 if structural impossibility preferred. Ship A first, evaluate B after real usage.
-
-### Defense-in-depth (both)
-
-`.gitignore`: `vault/ data/ notes/ personal/ *.pem *.key *.db *.sqlite *.env` · Gitleaks pre-commit hook (`gitleaks v8.18.0`) · GitHub server-side push protection (Settings → Code security).
-
-### Contributing back
-
-```bash
-git remote add myfork git@github.com:{handle}/knowledge-management.git
-git checkout -b feature/foo && git push myfork feature/foo
-# PR: myfork/feature/foo → upstream/main
-```
-
-Full spec + hook content: `tests/v1_spec.bats`.
-
----
-
-## Contributing Features
-
-This repo is designed to be forked for personal vault use, which creates tension with contributing features back — your fork holds private notes, but PRs should only carry code changes.
-
-| Approach | How it works | Trade-offs |
-|---|---|---|
-| **A — Contribution fork** | Create a second, code-only fork at `{handle}-km-contrib`. Clone it without vault data. Push feature branches there; PR to upstream. | Clean separation. Requires managing two forks. |
-| **B — Throwaway branch** | In your personal fork, create a feature branch from upstream's `main` (no vault commits in history). Push it to a `contrib/` remote pointing at upstream. | One repo, but branch discipline required. |
-| **C — `okm port` topology** (v1) | After `okm port`, `origin` = private vault fork, `upstream` = public OSS. Feature branches go to a third throwaway fork and PR to `upstream/main`. | Cleanest long-term; requires `okm port` to ship first. |
-| **D — Codespace / devcontainer** | Contribute inside a GitHub Codespace that clones the public repo with no vault. `$OBSIDIAN_VAULT` points to an empty test vault. | No vault data ever leaves the machine. |
-
-**Recommended workflow (today):**
-
-```bash
-git fetch upstream
-git checkout -b feature/foo upstream/main
-bash tests/run_all.sh
-git remote add contrib git@github.com:{handle}-km-contrib/knowledge-management.git
-git push contrib feature/foo
-# PR: contrib/feature/foo → upstream/main
-```
-
-**Invariant:** vault data (`public/daily/`, `public/inbox/`, `public/archive/`) must never appear in any commit on a PR branch. `okm audit --code-only` checks this.
-
----
-
-## Portable Vault Specification (PVS) v1.0
-
-Every note readable with `cat`/`grep`/any CommonMark renderer without Obsidian.
-
-### §0. Artifact tiers
-
-| Tier | Type | Examples | Portable? |
-|---|---|---|---|
-| **1 – Core** | Plain markdown + YAML frontmatter | `.md`, attachments | ✅ |
-| **2 – Derived** | Obsidian-aware, reconstructable | `.canvas`, `.base`, `.excalidraw.md` | ⚠️ w/ fallback |
-| **3 – Opaque** | App/plugin state | `.obsidian/`, live query output | ❌ |
-
-Rule 0: Tier-3 never sole record. Tier-2 must have Tier-1 fallback. Tier-1 is source of truth.
-
-### §1. Link format
-
-**MUST** use `[Display](relative/path.md)` — no `[[wikilinks]]`. Relative paths only. Heading anchors OK.
-
-### §2. YAML frontmatter
-
-```yaml
----
-title: string
-date: YYYY-MM-DD
-modified: YYYY-MM-DD
-tags: [flat, list]       # no nested taxonomies
-aliases: [list]
-status: draft|active|archived
-type: note|moc|log|ref|project
-source: url-or-citation
----
-```
-
-Plugin keys allowed only if valid YAML strings + documented in `VAULT_SCHEMA.md`.
-
-### §3. Query blocks
-
-Every query block must include a static snapshot:
-
-````markdown
-```dataview
-TABLE date, status FROM #project WHERE status = "active"
-```
-<!-- Static snapshot updated: 2026-05-01 -->
-| Title | Date | Status |
-````
-
-### §4. Ejectability properties
-
-| Property | Requirement |
-|---|---|
-| **Completeness** | Bundle: all notes, attachments, config, static fallbacks |
-| **Self-hostability** | Fresh machine opens vault in neovim via `neovim/install.sh` |
-| **Continuity** | Every Obsidian workflow has named fallback; degradation documented |
-| **Reversibility** | Notes move Obsidian ↔ neovim without repair |
-| **Link integrity (U1)** | Every relative link resolves — `scripts/link-integrity.sh` must exit 0 |
-| **MVR compatibility (U2)** | Any app satisfying the MVR contract can open the vault |
-| **Threat model (U3)** | `VAULT_SCHEMA.md` documents each dependency + mitigation |
-| **Ejection runbook (U4)** | `EJECT.md`: neovim / any editor / read-only options + "What you will lose" |
-| **Observability (U5)** | `scripts/ejectability-check.py` reports portability debt continuously |
-
-**MVR contract** (Minimum Viable Reader):
-
-| Capability | Level |
-|---|---|
-| Render CommonMark; parse YAML 1.1; follow relative links; render code blocks + tables; list files | MUST |
-| Full-text search; resolve backlinks | SHOULD |
-
-**Threat model scenarios:**
-
-| Threat | Mitigation |
-|---|---|
-| App death (Obsidian shuts down) | All notes pass MVR; neovim distribution present |
-| Plugin death (Dataview/Tasks/Excalidraw abandoned) | Static snapshots; SVG exports alongside `.excalidraw.md` |
-| Format death (`.canvas`/`.base` schema change) | Companion `.md` for every Tier-2 artifact |
-
-### Required vault files
-
-```
-VAULT_INDEX.md       — editor-agnostic entry point
-VAULT_SCHEMA.md      — frontmatter allowlist, folder rules, threat model
-VAULT_MANIFEST.json  — machine-readable spec version, workflow continuity map
-EJECT.md             — ejection runbook (3 options + degraded features list)
-neovim/              — pinned plugins, config, setup guide
-Templates/plain/     — Obsidian template parity in plain text
-scripts/             — smoke-test.sh, link-integrity.sh, snapshot.py, ejectability-check.py
-```
-
-### Compliance checklist
-
-- Every Tier-1 note readable as plain Markdown
-- Every Tier-2 artifact has a Tier-1 fallback
-- No Tier-3 artifact is sole source of structure or knowledge
-- Bundle validated: `scripts/smoke-test.sh && scripts/link-integrity.sh` exit 0
-- neovim distribution reproducible on a fresh machine
-- Every workflow has a declared fallback or is marked degraded
-- Notes move Obsidian ↔ neovim without repair
-- Portability debt visible via `ejectability-check.py`
-
-**Minimum neovim stack:** `obsidian.nvim` + `markdown-oxide` (LSP backlinks) + Telescope + snippet support.
-
-**Implementation status:** Tier-1 plain markdown and inline-array YAML are compliant now. v3 work: migrate `[[wikilinks]]`, `okm audit` PVS rules, hierarchical tag decision, query snapshot infra.
-
-**Open questions:** Wikilink migration strategy (one-shot script vs `okm audit`-guided) · `#inline-tags` Tier-1 or Tier-2? · `VAULT_SCHEMA.md` versioning · Per-note PVS opt-out (`pvs: ignore`)?
+Full item lists: [`roadmap-features.md`](roadmap-features.md). v1 specs + reproduction steps: `tests/v1_spec.bats`. v0 shipped clusters and regression guard: [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md). Fork-safety architecture: [`docs/DESIGN_NOTES.md#fork-safety-architecture`](docs/DESIGN_NOTES.md#fork-safety-architecture).
 
 ---
 
@@ -529,26 +269,12 @@ Port slow Bash/Python utilities to Rust once patterns stabilize. **Mirror when:*
 
 ---
 
-## Open-sourcing checklist
-
-All items complete as of 2026-06-01.
-
-- [x] Personal notes and large binaries stripped from history (`git filter-repo`)
-- [x] Hardcoded handle replaced with `{your-handle}` placeholders throughout (CONTRIBUTING.md, `.loom/loom.yaml`, ORCHESTRATOR.md)
-- [x] Absolute machine paths removed from tracked files (`config/mpv/mpv.conf`, `.claude/settings.local.json` history)
-- [x] Release-readiness auditor added (`scripts/check-release-ready.sh` exits non-zero on PII/secrets)
-- [x] `.gitignore` covers binaries, venv, Claude Code system dirs, loom runtime artifacts
-- [x] README prerequisites, fork-rename, and direnv sequencing clarified
-- [x] `roadmap-features.md` committed and linked from README
-- [x] Both `origin` + `upstream` force-pushed after all history rewrites
-- [ ] **Identity** — commits carry the author name. Intentional if open-sourcing under your own name; otherwise rewrite with `git filter-repo --name-callback` / `--email-callback`.
-
----
-
 ## See Also
 
 - [`docs/ai-instructions.md`](docs/ai-instructions.md) — AI assistant rules
 - [`docs/skills/README.md`](docs/skills/README.md) — AI skills library
-- [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md) — N/B code index (design decisions and edge cases)
-- [`scripts/README.md`](scripts/README.md) — cron job docs
+- [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md) — N/B code index, fork-safety design, v0 shipped detail
+- [`docs/PVS.md`](docs/PVS.md) — Portable Vault Specification
+- [`scripts/README.md`](scripts/README.md) — cron job docs and crontab entries
 - [`scripts/setup-km.sh`](scripts/setup-km.sh) — canonical source for versions and defaults
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contributing features and fork workflow

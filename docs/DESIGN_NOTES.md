@@ -36,3 +36,48 @@ Each entry records the decision and why it exists, so the code comments stay ter
 | B2  | `okm tagged source` must NOT match `source/spotify` — exact tag comparison, not prefix/substring |
 | B3  | Block-style YAML tags (`tags:\n  - foo`) are read-supported but write operations refuse them (v0); write support is a v1 item |
 | B4  | Invalid characters in `-t` flag values (e.g. commas inside a tag, leading `-`) caught by `validate_tag` |
+
+---
+
+## v0 shipped — feature clusters and regression guard
+
+| Cluster | Summary |
+|---|---|
+| **Tagging** | Boundary regex, injection-safe dedup, frontmatter-less handling, hierarchical tags; block-style YAML read (B3); HR false-positive guard (N30); permission-preserving write (N31) |
+| **Privacy** | Vault `.gitignore`; `private/` exclusion; `okm audit`; fork-safety docs |
+| **Path safety** | `okm open`/`sync` vault-boundary checks; `list_notes` excludes `.git/` |
+| **Input validation** | YAML escaping; slug fail-closed; Spotify ID validation; `validate_tag` on flags |
+| **Templates** | Single-source placeholder substitution across all note types |
+| **Fuzz gate** | BATS property-test harness (Unicode/quotes/slashes/newlines/empty/long) |
+| **Test/CI** | 280+ BATS tests isolated via `FAKE_VAULT_DIR`; CI green on main |
+
+**Regression guard** — don't break these in v1+: 280+ BATS tests via `FAKE_VAULT_DIR` + fake `$HOME` · `scripts/lib/scan.sh` shared library · idempotent `scripts/setup-km.sh`/`okm new/today/spot` · `scripts/verify-km.sh` exit-code discipline · `docs/skills/`/`private/` privacy boundary · minimal correct CI.
+
+---
+
+## Fork-safety architecture (v1)
+
+Structural goal: accidental pushes to upstream impossible. Two topologies under evaluation.
+
+### Approach A — asymmetric remotes
+
+`origin` → private user repo · `upstream` → public OSS (fetch-only, push URL `DISABLED`) · pre-push hook blocklists upstream · `okm sync` refuses if `origin` matches upstream.
+
+**`okm port <handle> [--public] [--no-push]`:** `gh` auth + `okm audit` → create private repo → rename/disable upstream → add new origin → install hook → push.
+
+*Pro:* minimal delta from v0. *Con:* vault shares git history with app; PRs need throwaway fork.
+
+### Approach B — two-repo split
+
+**B1 (submodule):** private repo contains public app as `app/` submodule; vault in `vault/`.
+**B2 (side-by-side):** public repo for code; `OBSIDIAN_VAULT` env var points to separate private vault.
+
+*Pro:* no shared history; clean fork/PR; B2 is near-zero code change. *Con:* must extract vault dirs; `okm sync` semantics change.
+
+**Decision:** A if minimal change acceptable. B2 if structural impossibility preferred. Ship A first, evaluate B after real usage.
+
+### Defense-in-depth (both)
+
+`.gitignore`: `vault/ data/ notes/ personal/ *.pem *.key *.db *.sqlite *.env` · Gitleaks pre-commit hook (`gitleaks v8.18.0`) · GitHub server-side push protection (Settings → Code security).
+
+Full spec + hook content: `tests/v1_spec.bats`.
