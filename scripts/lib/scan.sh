@@ -130,6 +130,11 @@ scan_directory() {
     fi
 }
 
+# Extract unchecked items from a sed range of a section.
+_unchecked_from_section() {
+    printf '%s\n' "$1" | sed -n "$2" | grep '^\- \[ \]' || true
+}
+
 # Merge unchecked items from a previous day section into a new day section.
 carry_forward_into() {
     local new_section="$1"
@@ -141,46 +146,27 @@ carry_forward_into() {
     fi
 
     local prev_projects prev_areas prev_resources
-    prev_projects="$(echo "$prev_section" | sed -n '/^#### Projects/,/^#### Areas/p' | grep '^\- \[ \]' || true)"
-    prev_areas="$(echo "$prev_section" | sed -n '/^#### Areas/,/^#### Resources/p' | grep '^\- \[ \]' || true)"
-    prev_resources="$(echo "$prev_section" | sed -n '/^#### Resources/,/^---$/p' | grep '^\- \[ \]' || true)"
+    prev_projects="$(_unchecked_from_section "$prev_section" '/^#### Projects/,/^#### Areas/p')"
+    prev_areas="$(_unchecked_from_section "$prev_section" '/^#### Areas/,/^#### Resources/p')"
+    prev_resources="$(_unchecked_from_section "$prev_section" '/^#### Resources/,/^---$/p')"
 
-    local current_bucket=""
-    local result=""
+    local _merge_items  # carries items to inject at current bucket boundary
+    _merge_items() {
+        local items="$1"
+        [[ -z "$items" ]] && return
+        while IFS= read -r item; do
+            printf '%s\n' "$new_section" | grep -qF "$item" || result+="${item}"$'\n'
+        done <<< "$items"
+    }
+
+    local current_bucket="" result=""
     while IFS= read -r line; do
         case "$line" in
             "#### Projects") current_bucket="projects" ;;
-            "#### Areas")
-                if [[ -n "$prev_projects" ]]; then
-                    while IFS= read -r item; do
-                        if ! echo "$new_section" | grep -qF "$item"; then
-                            result+="${item}"$'\n'
-                        fi
-                    done <<< "$prev_projects"
-                fi
-                current_bucket="areas"
-                ;;
-            "#### Resources")
-                if [[ -n "$prev_areas" ]]; then
-                    while IFS= read -r item; do
-                        if ! echo "$new_section" | grep -qF "$item"; then
-                            result+="${item}"$'\n'
-                        fi
-                    done <<< "$prev_areas"
-                fi
-                current_bucket="resources"
-                ;;
+            "#### Areas")    _merge_items "$prev_projects"; current_bucket="areas" ;;
+            "#### Resources") _merge_items "$prev_areas";  current_bucket="resources" ;;
             "---")
-                if [[ "$current_bucket" == "resources" ]]; then
-                    if [[ -n "$prev_resources" ]]; then
-                        while IFS= read -r item; do
-                            if ! echo "$new_section" | grep -qF "$item"; then
-                                result+="${item}"$'\n'
-                            fi
-                        done <<< "$prev_resources"
-                    fi
-                    current_bucket=""
-                fi
+                [[ "$current_bucket" == "resources" ]] && { _merge_items "$prev_resources"; current_bucket=""; }
                 ;;
         esac
         result+="${line}"$'\n'

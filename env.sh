@@ -72,12 +72,16 @@ fi
 
 # --- Shell helpers (override global vf/vr to exclude venv/) ---
 # vf: fuzzy-find a file and open it in vim (skips venv/)
-vf() { local file; file=$(rg --files --glob '!venv' | fzf) && vim "$file"; }
+vf() {
+  local file
+  file="$(rg --files --glob '!venv' | fzf)" || return 0
+  [ -n "$file" ] && vim "$file"
+}
 # vr: grep via rg+fzf and open at the matched line (skips venv/)
 vr() {
   local sel file line
-  sel=$(rg -i --line-number --no-heading --color=never --glob '!venv' "$@" | fzf) || return
-  file=$(echo "$sel" | cut -d: -f1)
-  line=$(echo "$sel" | cut -d: -f2)
-  vim +"$line" "$file"
+  sel="$(rg -i --line-number --no-heading --color=never --glob '!venv' "$@" | fzf)" || return 0
+  file="$(printf '%s' "$sel" | cut -d: -f1)"
+  line="$(printf '%s' "$sel" | cut -d: -f2)"
+  [ -n "$file" ] && [ -n "$line" ] && vim +"$line" "$file"
 }

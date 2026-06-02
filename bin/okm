@@ -29,6 +29,7 @@ if [ "${KM_INCLUDE_PRIVATE:-0}" != "1" ]; then
   PRIVATE_RG_GLOBS=(--glob '!private/')
   PRIVATE_FIND_PRUNE=(-not -path "$VAULT/private/*")
 fi
+FIND_GIT_PRUNE=(-not -path '*/.git/*')
 
 usage() {
   cat <<'EOF'
@@ -189,6 +190,44 @@ build_tags_yaml() {
   echo "tags: [${csv}]"
 }
 
+# Build a tags YAML value from optional default tags and the -t flag output.
+# Reads TAG_FLAG_VALUES (set by parse_tag_flag). Returns [defaults, extra] or [].
+_tags_yaml() {
+  local defaults="${1:-}"
+  local extra
+  extra="$(printf '%s' "${TAG_FLAG_VALUES:-}" | sed 's/,/, /g')"
+  if [ -n "$defaults" ] && [ -n "$extra" ]; then
+    printf '[%s, %s]' "$defaults" "$extra"
+  elif [ -n "$extra" ]; then
+    printf '[%s]' "$extra"
+  elif [ -n "$defaults" ]; then
+    printf '[%s]' "$defaults"
+  else
+    printf '[]'
+  fi
+}
+
+# Shared fzf picker: height/border/prompt are uniform across all note pickers.
+_fzf_pick() { fzf --height=40% --reverse --border --prompt="${1:-notes}> "; }
+
+# N30: lone --- (horizontal rule) is not frontmatter — hard-fail before tagging.
+_hr_frontmatter_guard() {
+  local file="$1" verb="${2:-tag}"
+  if [ "$(head -n1 "$file")" = "---" ] && ! has_frontmatter "$file"; then
+    echo "Cannot ${verb}: '$(basename "$file")' starts with '---' but has no valid frontmatter" >&2
+    exit 1
+  fi
+}
+
+# Assert a resolved path is inside the vault; prints message and returns 1 if not.
+_assert_in_vault() {
+  local resolved="$1" vault_real="$2" ctx="${3:-path}"
+  case "$resolved" in
+    "$vault_real"|"$vault_real"/*) return 0 ;;
+    *) echo "${ctx}: path resolves outside the vault" >&2; return 1 ;;
+  esac
+}
+
 # Rewrite the tags line inside the first frontmatter block. If no tags line
 # exists in the first frontmatter, insert one immediately before the closing
 # `---`. Body content (including any later `---...---` blocks) is preserved
@@ -256,19 +295,14 @@ resolve_note() {
   fi
   local vault_real
   vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
-  case "$resolved" in
-    "$vault_real"|"$vault_real"/*) ;;
-    *)
-      echo "Refusing: path resolves outside the vault ($resolved)" >&2
-      return 1 ;;
-  esac
+  _assert_in_vault "$resolved" "$vault_real" "okm" || return 1
   echo "$resolved"
 }
 
 # Walk vault .md files honouring the private-folder default.
 list_vault_md_files() {
-  find "$VAULT" -type f -name '*.md' -not -path '*/.git/*' \
-    "${PRIVATE_FIND_PRUNE[@]}" -print 2>/dev/null
+  find "$VAULT" -type f -name '*.md' \
+    "${FIND_GIT_PRUNE[@]}" "${PRIVATE_FIND_PRUNE[@]}" -print 2>/dev/null
 }
 
 # List all tags across the vault with counts, or show tags for a specific note.
@@ -313,11 +347,7 @@ add_tags() {
   local file
   file="$(resolve_note "$note")"
 
-  # N30: lone --- (HR) is not frontmatter — error rather than silently prepending
-  if [ "$(head -n1 "$file")" = "---" ] && ! has_frontmatter "$file"; then
-    echo "Cannot tag: '$(basename "$file")' starts with '---' but has no valid frontmatter" >&2
-    exit 1
-  fi
+  _hr_frontmatter_guard "$file" "tag"
 
   if ! has_frontmatter "$file"; then
     local tmp orig_perms
@@ -362,11 +392,7 @@ remove_tags() {
   local file
   file="$(resolve_note "$note")"
 
-  # N30: lone --- (HR) is not frontmatter
-  if [ "$(head -n1 "$file")" = "---" ] && ! has_frontmatter "$file"; then
-    echo "Cannot untag: '$(basename "$file")' starts with '---' but has no valid frontmatter" >&2
-    exit 1
-  fi
+  _hr_frontmatter_guard "$file" "untag"
 
   if ! has_frontmatter "$file"; then
     echo "No tags to remove (no frontmatter)"
@@ -462,13 +488,13 @@ parse_tag_flag() {
 }
 
 list_notes() {
-  find "$VAULT" -type f -name '*.md' -not -path '*/.git/*' \
-    "${PRIVATE_FIND_PRUNE[@]}" | sed "s#^$VAULT/##"
+  find "$VAULT" -type f -name '*.md' \
+    "${FIND_GIT_PRUNE[@]}" "${PRIVATE_FIND_PRUNE[@]}" | sed "s#^$VAULT/##"
 }
 
 pick_file() {
   need_cmd fzf
-  list_notes | sort | fzf --height=40% --reverse --border --prompt="notes> "
+  list_notes | sort | _fzf_pick "notes"
 }
 
 open_note() {
@@ -515,10 +541,7 @@ new_note() {
   local title="${_REMAINING_ARGS[*]:-}"
   [ -n "$title" ] || { echo "Title required" >&2; exit 1; }
 
-  local tags_yaml="[]"
-  if [ -n "$TAG_FLAG_VALUES" ]; then
-    tags_yaml="[$(echo "$TAG_FLAG_VALUES" | sed 's/,/, /g')]"
-  fi
+  local tags_yaml; tags_yaml="$(_tags_yaml)"
 
   local slug file
   slug="$(slugify "$title")" || exit 1
@@ -549,10 +572,7 @@ capture_note() {
   parse_tag_flag "$@"
   local body="${_REMAINING_ARGS[*]:-}"
 
-  local tags_yaml="[capture, inbox]"
-  if [ -n "$TAG_FLAG_VALUES" ]; then
-    tags_yaml="[capture, inbox, $(echo "$TAG_FLAG_VALUES" | sed 's/,/, /g')]"
-  fi
+  local tags_yaml; tags_yaml="$(_tags_yaml "capture, inbox")"
 
   local file ts
   ts="$(timestamp)"
@@ -611,7 +631,7 @@ files_vault() {
   if [ -z "$pattern" ]; then
     list_notes | sort
   else
-    list_notes | grep -i -- "$pattern" | sort || true
+    list_notes | grep -i -- "$pattern" | sort
   fi
 }
 
@@ -628,16 +648,13 @@ recent_notes() {
       | head -200 \
       | cut -d' ' -f2- \
       | sed "s#^$(printf '%s' "$VAULT" | sed 's/[#&\\/]/\\&/g')/##" \
-      | fzf --height=40% --reverse --border --prompt="recent> "
+      | _fzf_pick "recent"
   )" || true  # fzf exits 130 on Escape/Ctrl-C; treat as empty selection
   [ -n "${picked:-}" ] || exit 0
   local resolved vault_real
   resolved="$(realpath -m -- "$VAULT/$picked" 2>/dev/null || true)"
   vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
-  case "$resolved" in
-    "$vault_real"|"$vault_real"/*) ;;
-    *) echo "Path outside vault: $picked" >&2; exit 1 ;;
-  esac
+  _assert_in_vault "$resolved" "$vault_real" "okm recent" || exit 1
   exec "$EDITOR_CMD" "$VAULT/$picked"
 }
 
@@ -662,7 +679,7 @@ sync_git() {
         "$vault_real"|"$vault_real"/*) ;;
         *) bad_links+="  ${link} -> ${tgt}"$'\n' ;;
       esac
-    done < <(find "$VAULT" -type l -not -path '*/.git/*' 2>/dev/null)
+    done < <(find "$VAULT" -type l "${FIND_GIT_PRUNE[@]}" 2>/dev/null)
   fi
   if [ -n "$bad_links" ]; then
     echo "okm sync: refusing — vault contains symlinks pointing outside the vault:" >&2
@@ -695,51 +712,70 @@ sync_git() {
   fi
 }
 
+_spotify_type() {
+  case "$1" in
+    *episode*)  echo "episode" ;;
+    *show*)     echo "show" ;;
+    *album*)    echo "album" ;;
+    *playlist*) echo "playlist" ;;
+    *)          echo "track" ;;
+  esac
+}
+
+# N16: extract and validate the Spotify ID (exactly 22 base62 chars).
+_spotify_id() {
+  local url="$1" id
+  id="$(printf '%s' "$url" | sed -E 's#.*/[a-z]+/([a-zA-Z0-9]+)(\?.*)?$#\1#')"
+  if [ -z "$id" ] || [[ ! "$id" =~ ^[a-zA-Z0-9]{22}$ ]]; then
+    echo "Invalid Spotify URL: could not extract a valid ID from '$url'" >&2
+    return 1
+  fi
+  echo "$id"
+}
+
+_SPOT_ARTIST="" _SPOT_TITLE=""
+_spotify_fetch_metadata() {
+  _SPOT_ARTIST=""; _SPOT_TITLE=""
+  local url="$1" spot_type="$2"
+  [ "$spot_type" != "episode" ] && [ "$spot_type" != "show" ] && \
+    command -v spotdl >/dev/null 2>&1 || return 0
+  local meta
+  meta="$(spotdl save "$url" --output "{artist} - {title}" 2>/dev/null | head -1 || true)"
+  [ -n "$meta" ] || return 0
+  _SPOT_ARTIST="$(printf '%s' "$meta" | sed 's/ - .*//')"
+  _SPOT_TITLE="$(printf '%s' "$meta" | sed 's/^[^-]*- //')"
+}
+
+_spotify_source_tag() {
+  case "$1" in
+    episode|show) echo "source/podcast" ;;
+    track|album)  echo "source/music" ;;
+    playlist)     echo "source/playlist" ;;
+    *)            echo "source/spotify" ;;
+  esac
+}
+
 spot_note() {
   ensure_dirs
   parse_tag_flag "$@"
   local url="${_REMAINING_ARGS[0]:-}"
   [ -n "$url" ] || { echo "Spotify URL required" >&2; exit 1; }
 
-  # Validate it's a Spotify URL
   case "$url" in
     *open.spotify.com/*|*spotify:*) ;;
     *) echo "Not a Spotify URL: $url" >&2; exit 1 ;;
   esac
 
-  # Determine content type from URL
-  local spot_type="track"
-  case "$url" in
-    *episode*) spot_type="episode" ;;
-    *show*)    spot_type="show" ;;
-    *album*)   spot_type="album" ;;
-    *playlist*) spot_type="playlist" ;;
-    *track*)   spot_type="track" ;;
-  esac
-
-  # N16: extract and validate the Spotify ID (exactly 22 base62 chars).
-  local spot_id embed_url
-  spot_id="$(echo "$url" | sed -E 's#.*/[a-z]+/([a-zA-Z0-9]+)(\?.*)?$#\1#')"
-  if [ -z "$spot_id" ] || [[ ! "$spot_id" =~ ^[a-zA-Z0-9]{22}$ ]]; then
-    echo "Invalid Spotify URL: could not extract a valid ID from '$url'" >&2
-    exit 1
-  fi
+  local spot_type spot_id embed_url
+  spot_type="$(_spotify_type "$url")"
+  spot_id="$(_spotify_id "$url")" || exit 1
   embed_url="https://open.spotify.com/embed/${spot_type}/${spot_id}"
 
-  # Try spotdl for metadata (tracks/albums/playlists)
-  local title="" artist=""
-  if command -v spotdl >/dev/null 2>&1 && [ "$spot_type" != "episode" ] && [ "$spot_type" != "show" ]; then
-    local meta
-    meta="$(spotdl save "$url" --output "{artist} - {title}" 2>/dev/null | head -1 || true)"
-    if [ -n "$meta" ]; then
-      artist="$(echo "$meta" | sed 's/ - .*//')"
-      title="$(echo "$meta" | sed 's/^[^-]*- //')"
-    fi
-  fi
+  _spotify_fetch_metadata "$url" "$spot_type"
+  local title="${_SPOT_TITLE}" artist="${_SPOT_ARTIST}"
 
-  # Fallback title from URL slug
   if [ -z "$title" ]; then
-    title="$(echo "$url" | sed -E 's|.*/[a-zA-Z]+/[a-zA-Z0-9]+[?/]?||; s/[?#].*//' | tr '-' ' ')"
+    title="$(printf '%s' "$url" | sed -E 's|.*/[a-zA-Z]+/[a-zA-Z0-9]+[?/]?||; s/[?#].*//' | tr '-' ' ')"
     [ -n "$title" ] || title="Spotify ${spot_type} ${spot_id}"
   fi
 
@@ -747,21 +783,11 @@ spot_note() {
   slug="$(slugify "$title")" || exit 1
   file="$VAULT/$NOTES_DIR/$slug.md"
 
-  local safe_title safe_artist
+  local safe_title safe_artist source_tag tags_yaml
   safe_title="$(yaml_escape_dq "$title")"
   safe_artist="$(yaml_escape_dq "$artist")"
-
-  local source_tag="source/spotify"
-  case "$spot_type" in
-    episode|show) source_tag="source/podcast" ;;
-    track|album)  source_tag="source/music" ;;
-    playlist)     source_tag="source/playlist" ;;
-  esac
-
-  local tags_csv="${source_tag}"
-  if [ -n "$TAG_FLAG_VALUES" ]; then
-    tags_csv="${source_tag}, $(echo "$TAG_FLAG_VALUES" | sed 's/,/, /g')"
-  fi
+  source_tag="$(_spotify_source_tag "$spot_type")"
+  tags_yaml="$(_tags_yaml "$source_tag")"
 
   if [ ! -f "$file" ]; then
     case "$spot_type" in
@@ -773,7 +799,7 @@ source_type: spotify-${spot_type}
 source_url: "${url}"
 author: "${safe_artist}"
 created: $(iso_now)
-tags: [${tags_csv}]
+tags: ${tags_yaml}
 ---
 
 # ${title}
@@ -818,7 +844,7 @@ source_type: spotify-${spot_type}
 source_url: "${url}"
 author: "${safe_artist}"
 created: $(iso_now)
-tags: [${tags_csv}]
+tags: ${tags_yaml}
 ---
 
 # ${title}
@@ -877,6 +903,69 @@ Exit codes:  0 clean  ·  1 findings  ·  2 usage error
 EOF
 }
 
+_audit_collect_files() {
+  local root="$1"
+  {
+    git -C "$root" ls-files 2>/dev/null
+    git -C "$root" diff --cached --name-only --diff-filter=A 2>/dev/null
+  } | sort -u
+}
+
+# stdin: file list (one per line). $@: allowed path prefixes (pass-through if none).
+_audit_filter_paths() {
+  [ $# -eq 0 ] && { cat; return; }
+  local restrict_paths=("$@")
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    for p in "${restrict_paths[@]}"; do
+      case "$f" in "$p"|"$p"/*) echo "$f"; break ;; esac
+    done
+  done
+}
+
+# Emit one finding-line per issue in a single tracked file. stdout only.
+_audit_check_file() {
+  local root="$1" f="$2" code_only="$3"
+  local full="$root/$f" base
+  base="$(basename "$f")"
+  [ -e "$full" ] || return 0
+
+  # 1. PARA content (skipped under --code-only).
+  if ! $code_only; then
+    local skip=false
+    case "$f" in public/inbox/templates/*) skip=true ;; esac
+    case "$base" in demo-*) skip=true ;; esac
+    if ! $skip; then
+      case "$f" in
+        public/daily/*.md|public/inbox/*.md|public/archive/*.md)
+          echo "${f}:1: para-content user note in public PARA folder" ;;
+        public/attachments/*)
+          echo "${f}:1: para-content attachment" ;;
+        private/*/*)
+          echo "${f}:1: para-content file in private/" ;;
+      esac
+    fi
+  fi
+
+  # 2. Sensitive filenames.
+  case "$base" in
+    .env|.env.*|*.pem|*.key|*.crt|*credentials*|id_rsa|id_rsa.*|id_ed25519|id_ed25519.*)
+      echo "${f}:1: sensitive-filename matches forbidden pattern" ;;
+  esac
+
+  # 3. Secret patterns (text-file content scan; -I skips binary).
+  [ -f "$full" ] || return 0
+  local matches
+  matches="$(grep -InE \
+    '(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' \
+    "$full" 2>/dev/null || true)"
+  [ -n "$matches" ] || return 0
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    echo "${f}:${m%%:*}: secret-pattern match"
+  done <<< "$matches"
+}
+
 audit_run() {
   local code_only=false vault_only=false quiet=false
   local restrict_paths=()
@@ -901,11 +990,7 @@ audit_run() {
   fi
 
   local root
-  if $code_only; then
-    root="$OKM_SCRIPT_DIR"
-  else
-    root="$VAULT"
-  fi
+  if $code_only; then root="$OKM_SCRIPT_DIR"; else root="$VAULT"; fi
 
   if [ ! -d "${root}/.git" ]; then
     echo "okm audit: ${root} is not a git repository — nothing to scan" >&2
@@ -913,77 +998,22 @@ audit_run() {
   fi
 
   local files
-  files="$(
-    {
-      git -C "$root" ls-files 2>/dev/null
-      git -C "$root" diff --cached --name-only --diff-filter=A 2>/dev/null
-    } | sort -u
-  )"
+  files="$(_audit_collect_files "$root" \
+    | _audit_filter_paths "${restrict_paths[@]+"${restrict_paths[@]}"}")"
 
-  if [ ${#restrict_paths[@]} -gt 0 ] && [ -n "$files" ]; then
-    local filtered=""
-    while IFS= read -r f; do
-      [ -n "$f" ] || continue
-      for p in "${restrict_paths[@]}"; do
-        case "$f" in
-          "$p"|"$p"/*) filtered+="${f}"$'\n'; break ;;
-        esac
-      done
-    done <<< "$files"
-    files="$filtered"
-  fi
-
-  local findings=0 out=""
+  local out=""
   if [ -n "$files" ]; then
     while IFS= read -r f; do
       [ -n "$f" ] || continue
-      local full="$root/$f" base
-      base="$(basename "$f")"
-      [ -e "$full" ] || continue
-
-      # 1. PARA content (skipped under --code-only).
-      if ! $code_only; then
-        local skip=false
-        case "$f" in public/inbox/templates/*) skip=true ;; esac
-        case "$base" in demo-*) skip=true ;; esac
-        if ! $skip; then
-          case "$f" in
-            public/daily/*.md|public/inbox/*.md|public/archive/*.md)
-              out+="${f}:1: para-content user note in public PARA folder"$'\n'
-              findings=$((findings+1)) ;;
-            public/attachments/*)
-              out+="${f}:1: para-content attachment"$'\n'
-              findings=$((findings+1)) ;;
-            private/*/*)
-              out+="${f}:1: para-content file in private/"$'\n'
-              findings=$((findings+1)) ;;
-          esac
-        fi
-      fi
-
-      # 2. Sensitive filenames.
-      case "$base" in
-        .env|.env.*|*.pem|*.key|*.crt|*credentials*|id_rsa|id_rsa.*|id_ed25519|id_ed25519.*)
-          out+="${f}:1: sensitive-filename matches forbidden pattern"$'\n'
-          findings=$((findings+1)) ;;
-      esac
-
-      # 3. Secret patterns (text-file content scan; -I skips binary).
-      if [ -f "$full" ]; then
-        local matches
-        matches="$(grep -InE \
-          '(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' \
-          "$full" 2>/dev/null || true)"
-        if [ -n "$matches" ]; then
-          while IFS= read -r m; do
-            [ -n "$m" ] || continue
-            out+="${f}:${m%%:*}: secret-pattern match"$'\n'
-            findings=$((findings+1))
-          done <<< "$matches"
-        fi
-      fi
+      local fout
+      fout="$(_audit_check_file "$root" "$f" "$code_only")"
+      [ -n "$fout" ] && out+="${fout}"$'\n'
     done <<< "$files"
   fi
+  out="$(printf '%s' "$out" | sort -u)"
+
+  local findings=0
+  [ -n "$out" ] && findings="$(printf '%s\n' "$out" | grep -c .)"
 
   if [ "$findings" -eq 0 ]; then
     if ! $quiet; then
@@ -996,7 +1026,7 @@ audit_run() {
 
   if ! $quiet; then
     echo "okm audit: ${findings} finding(s) in ${root}:" >&2
-    printf '%s' "$out" | sort -u
+    printf '%s\n' "$out"
   fi
   return 1
 }

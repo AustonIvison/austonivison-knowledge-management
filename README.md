@@ -26,23 +26,9 @@ Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI
 
 ---
 
-## Prerequisites
-
-Before running setup, ensure the following are available on your machine:
-
-| Requirement | Notes |
-|---|---|
-| `git` | `git --version` |
-| `curl` | `curl --version` |
-| `flatpak` | `flatpak --version` — needed for Obsidian |
-| `sudo` access | `setup-km.sh` installs apt packages |
-| GitHub account | For forking and syncing your vault |
-
-**Platform:** Debian/Ubuntu only (apt + Flatpak). x86_64 or arm64.
-
----
-
 ## Setup
+
+**Prerequisites:** `git`, `curl`, `flatpak`, `sudo` access, GitHub account. Debian/Ubuntu only.
 
 > **Fork first.** On GitHub: fork this repo, then go to your fork's **Settings → General → Repository name** and rename it to `{your-github-handle}-knowledge-management`. Clone *your fork*, not this repo, so `okm sync` pushes to your private copy.
 
@@ -54,7 +40,7 @@ bash scripts/setup-km.sh && source env.sh && bash scripts/verify-km.sh
 bash tests/run_all.sh
 ```
 
-> **Note:** Run `bash scripts/setup-km.sh` before `direnv allow .` — setup installs `direnv` itself. Running `direnv allow .` first will fail if `direnv` is not yet on your PATH.
+> **Note:** Run `bash scripts/setup-km.sh` before `direnv allow .` — setup installs `direnv` itself.
 
 Setup prompt: **Track notes in git?** (default: yes). Pre-set with `KM_TRACK_NOTES=true|false`. Logs at `~/.local/log/setup-km-*.log`.
 
@@ -70,7 +56,7 @@ bash scripts/seed-demo.sh --teardown   # clean up
 
 **Obsidian:** `okm obs` → open `$(okm path)` as vault on first launch.
 **Neovim:** `nvim public/daily/demo-$(date +%Y-%m-%d).md` — expect green `PUBLIC PARA · daily` winbar, TODO/FIXME/BUG highlights, `<leader>od/on/os/oo/ob` keymaps. If missing: `NVIM_APPNAME=km nvim --headless "+Lazy! sync" +qa`.
-**Vim:** `EDITOR=vim okm open public/inbox/demo-meeting-notes.md` — expect green `PUBLIC PARA · inbox` statusline. (`bin/vim` wraps `vim -u config/vim/vimrc`; `bin/` is first on `$PATH` via `env.sh` so `vim` loads project config without touching `~/.vimrc`; wrapper used instead of `$VIMINIT` because nvim also honors it.)
+**Vim:** `EDITOR=vim okm open public/inbox/demo-meeting-notes.md` — expect green `PUBLIC PARA · inbox` statusline. (`bin/vim` wraps `vim -u config/vim/vimrc`; `bin/` is first on `$PATH` via `env.sh` so `vim` loads project config without touching `~/.vimrc`.)
 **Private side test:** `nvim private/inbox/demo-private.md` → red `⚠ PRIVATE PARA` banner.
 
 Seeded files:
@@ -236,13 +222,13 @@ Tools: yt-dlp, spotdl, whisperX (large-v3-turbo), ffmpeg, mpv (`s` key → scree
 
 ## Cron Jobs
 
+TODO → PARA: `TODO/FIXME/HACK/XXX` = Projects, `- [ ]` = Areas, `REVIEW:` = Resources.
+
 | Schedule | Script | Output |
 |---|---|---|
 | 07:00, 12:00, 15:00 | `todo-summary.sh --output` | `public/inbox/todo-summary-YYYY.md` |
 | 07:00, 12:00, 15:00 | `weekly-tasks.sh --output` | `public/inbox/weekly-DATE-to-DATE.md` |
 | 17:00 | `compress-images.py` | PNG/JPG → WebP |
-
-TODO → PARA: `TODO/FIXME/HACK/XXX` = Projects, `- [ ]` = Areas, `REVIEW:` = Resources.
 
 ```bash
 # Replace $KM with project path
@@ -296,8 +282,6 @@ git add .gitattributes && git commit -m "configure git-crypt"
 
 ## Roadmap
 
-> Plan-of-record. Audit trail lives in git log. **v0 is the stable release — all v1+ work builds on top of it. Stabilise v0 fully before advancing.**
-
 | Version | Status | Theme |
 |---|---|---|
 | **v0** | ✅ shipped | Core vault CLI, privacy boundary, hardened input |
@@ -309,16 +293,15 @@ git add .gitattributes && git commit -m "configure git-crypt"
 
 | Cluster | Summary |
 |---|---|
-| **Tagging** | Boundary regex, injection-safe dedup, frontmatter-less handling, hierarchical tags via awk; block-style YAML read (B3); HR false-positive guard (N30); permission-preserving write (N31) |
+| **Tagging** | Boundary regex, injection-safe dedup, frontmatter-less handling, hierarchical tags; block-style YAML read (B3); HR false-positive guard (N30); permission-preserving write (N31) |
 | **Privacy** | Vault `.gitignore`; `private/` exclusion; `okm audit`; fork-safety docs |
 | **Path safety** | `okm open`/`sync` vault-boundary checks; `list_notes` excludes `.git/` |
 | **Input validation** | YAML escaping; slug fail-closed; Spotify ID validation; `validate_tag` on flags |
-| **Templates** | Single-source placeholder substitution across all four producers |
+| **Templates** | Single-source placeholder substitution across all note types |
 | **Fuzz gate** | BATS property-test harness (Unicode/quotes/slashes/newlines/empty/long) |
 | **Test/CI** | 280+ BATS tests isolated via `FAKE_VAULT_DIR`; CI green on main |
-| **Skills** | PARA banners (nvim/vim); typed templates; `seed-demo.sh`; direnv; distill prompt |
 
-**Don't regress in v1+:** 280+ BATS tests isolated via `FAKE_VAULT_DIR` + fake `$HOME` · `scripts/lib/scan.sh` shared library (not duplicated) · idempotent `scripts/setup-km.sh`/`okm new/today/spot` · `scripts/verify-km.sh` exit-code discipline (FAIL blocks, WARN doesn't) · `docs/skills/`/`private/` privacy boundary · minimal correct CI.
+**Regression guard:** don't break these in v1+: 280+ BATS tests via `FAKE_VAULT_DIR` + fake `$HOME` · `scripts/lib/scan.sh` shared library · idempotent `scripts/setup-km.sh`/`okm new/today/spot` · `scripts/verify-km.sh` exit-code discipline · `docs/skills/`/`private/` privacy boundary · minimal correct CI.
 
 ### v1 — in design
 
@@ -372,22 +355,24 @@ Full specs + reproduction steps: `tests/v1_spec.bats`.
 
 ## Fork-safety architecture
 
-Goal: accidental pushes to upstream *structurally impossible*. Two topologies under evaluation.
+Structural goal: accidental pushes to upstream impossible. Two topologies under evaluation.
 
 ### Approach A — asymmetric remotes
 
-`origin` → private user repo · `upstream` → public OSS (fetch-only, push URL `DISABLED`) · pre-push hook blocklists upstream (override: `KM_ALLOW_UPSTREAM_PUSH=1`) · `okm sync` refuses if `origin` matches upstream. `okm sync` follows `@{u}` via bare `git push` (`bin/okm:639`) — safe once topology is set.
+`origin` → private user repo · `upstream` → public OSS (fetch-only, push URL `DISABLED`) · pre-push hook blocklists upstream · `okm sync` refuses if `origin` matches upstream.
 
 **`okm port <handle> [--public] [--no-push]`:** `gh` auth + `okm audit` → create private repo → rename/disable upstream → add new origin → install hook → push.
 
-*Pro:* minimal delta from v0. *Con:* vault shares git history with app; PRs need throwaway fork. Full spec + hook content: `tests/v1_spec.bats`.
+*Pro:* minimal delta from v0. *Con:* vault shares git history with app; PRs need throwaway fork.
 
 ### Approach B — two-repo split
 
 **B1 (submodule):** private repo contains public app as `app/` submodule; vault in `vault/`.
-**B2 (side-by-side):** public repo for code; `OBSIDIAN_VAULT` env var (already at `bin/okm:5-16`) points to separate private vault.
+**B2 (side-by-side):** public repo for code; `OBSIDIAN_VAULT` env var points to separate private vault.
 
-*Pro:* no shared history; clean fork/PR; B2 is near-zero code change. *Con:* must extract vault dirs from public repo; `okm sync` semantics change.
+*Pro:* no shared history; clean fork/PR; B2 is near-zero code change. *Con:* must extract vault dirs; `okm sync` semantics change.
+
+**Decision:** A if minimal change acceptable. B2 if structural impossibility preferred. Ship A first, evaluate B after real usage.
 
 ### Defense-in-depth (both)
 
@@ -401,54 +386,39 @@ git checkout -b feature/foo && git push myfork feature/foo
 # PR: myfork/feature/foo → upstream/main
 ```
 
-### Decision
-
-**A** if: minimal change acceptable, hooks sufficient. **B2** if: structural impossibility preferred, one-time vault extraction OK. **Pragmatic:** ship A first, evaluate B after real usage.
-
-**Open questions:** Which approach? · `gh` as new dep (recommend: add to `setup-km.sh`) · `okm port --adopt` for existing forks · `verify-km.sh` post-port topology check · README "Privacy & Personal Data" section.
-
-**Tests:** BATS with fake `gh` shim; integration against local bare repo; `okm sync` against misconfigured `origin` must refuse; B2 `$OBSIDIAN_VAULT` outside app repo with its own remote.
+Full spec + hook content: `tests/v1_spec.bats`.
 
 ---
 
 ## Contributing Features
 
-**Problem:** this repo is designed to be forked for personal vault use, which creates a tension with contributing features back — your fork holds private notes, but PRs should only carry code changes.
-
-### Options
+This repo is designed to be forked for personal vault use, which creates tension with contributing features back — your fork holds private notes, but PRs should only carry code changes.
 
 | Approach | How it works | Trade-offs |
 |---|---|---|
 | **A — Contribution fork** | Create a second, code-only fork at `{handle}-km-contrib`. Clone it without vault data. Push feature branches there; PR to upstream. | Clean separation. Requires managing two forks. |
 | **B — Throwaway branch** | In your personal fork, create a feature branch from upstream's `main` (no vault commits in history). Push it to a `contrib/` remote pointing at upstream. | One repo, but branch discipline required. |
 | **C — `okm port` topology** (v1) | After `okm port`, `origin` = private vault fork, `upstream` = public OSS. Feature branches go to a third throwaway fork and PR to `upstream/main`. | Cleanest long-term; requires `okm port` to ship first. |
-| **D — Codespace / devcontainer** | Contribute entirely inside a GitHub Codespace or dev container that clones the public repo with no vault. `$OBSIDIAN_VAULT` points to an empty test vault. | No vault data ever leaves the machine. Requires Codespace setup. |
+| **D — Codespace / devcontainer** | Contribute inside a GitHub Codespace that clones the public repo with no vault. `$OBSIDIAN_VAULT` points to an empty test vault. | No vault data ever leaves the machine. |
 
-### Recommended workflow (today)
+**Recommended workflow (today):**
 
 ```bash
-# In your personal fork — create a clean feature branch from upstream
 git fetch upstream
 git checkout -b feature/foo upstream/main
-
-# Make changes, run tests
 bash tests/run_all.sh
-
-# Push to a separate contribution remote (not your private origin)
 git remote add contrib git@github.com:{handle}-km-contrib/knowledge-management.git
 git push contrib feature/foo
-# Then open PR: contrib/feature/foo → upstream/main
+# PR: contrib/feature/foo → upstream/main
 ```
 
 **Invariant:** vault data (`public/daily/`, `public/inbox/`, `public/archive/`) must never appear in any commit on a PR branch. `okm audit --code-only` checks this.
-
-**Open questions:** Should `setup-km.sh` create the contrib remote automatically? Should `okm port` set up a codespace config?
 
 ---
 
 ## Portable Vault Specification (PVS) v1.0
 
-Every note readable with `cat`/`grep`/any CommonMark renderer without Obsidian. Ref: [thymer.com/ejectable](https://thymer.com/ejectable).
+Every note readable with `cat`/`grep`/any CommonMark renderer without Obsidian.
 
 ### §0. Artifact tiers
 
@@ -507,14 +477,14 @@ TABLE date, status FROM #project WHERE status = "active"
 | **Ejection runbook (U4)** | `EJECT.md`: neovim / any editor / read-only options + "What you will lose" |
 | **Observability (U5)** | `scripts/ejectability-check.py` reports portability debt continuously |
 
-**MVR contract** (Minimum Viable Reader — the bar any app must clear):
+**MVR contract** (Minimum Viable Reader):
 
 | Capability | Level |
 |---|---|
 | Render CommonMark; parse YAML 1.1; follow relative links; render code blocks + tables; list files | MUST |
 | Full-text search; resolve backlinks | SHOULD |
 
-**Threat model scenarios** (document each in `VAULT_SCHEMA.md`):
+**Threat model scenarios:**
 
 | Threat | Mitigation |
 |---|---|
@@ -547,43 +517,31 @@ scripts/             — smoke-test.sh, link-integrity.sh, snapshot.py, ejectabi
 
 **Minimum neovim stack:** `obsidian.nvim` + `markdown-oxide` (LSP backlinks) + Telescope + snippet support.
 
-### Implementation status
+**Implementation status:** Tier-1 plain markdown and inline-array YAML are compliant now. v3 work: migrate `[[wikilinks]]`, `okm audit` PVS rules, hierarchical tag decision, query snapshot infra.
 
-**Compliant now:** Tier-1 plain markdown; inline-array YAML; near-PVS schema in templates.
-**Needs v3 work:** migrate `[[wikilinks]]`; `okm audit` rule for undoc'd keys; hierarchical tag decision; query snapshot infra.
-
-### Open questions
-
-- Wikilink migration: one-shot script or `okm audit`-guided?
-- `#inline-tags`: Tier-1 or Tier-2?
-- `VAULT_SCHEMA.md` versioning/bump rule
-- Per-note PVS opt-out (`pvs: ignore`)?
+**Open questions:** Wikilink migration strategy (one-shot script vs `okm audit`-guided) · `#inline-tags` Tier-1 or Tier-2? · `VAULT_SCHEMA.md` versioning · Per-note PVS opt-out (`pvs: ignore`)?
 
 ---
 
 ## Performance policy
 
-Port slow Bash/Python utilities (fuzz harness, `okm audit`, large TODO scans) to Rust once patterns stabilize. **Mirror when:** >1s on typical vault, hot-loop, or iteration-bound. **Don't mirror:** one-off scripts, I/O-bound, or anything still under active design. v2 "Rust mirror" row tracks this; v0/v1 stay in Bash/Python.
+Port slow Bash/Python utilities to Rust once patterns stabilize. **Mirror when:** >1s on typical vault, hot-loop, or iteration-bound. **Don't mirror:** one-off scripts, I/O-bound, or anything still under active design. v2 "Rust mirror" row tracks this; v0/v1 stay in Bash/Python.
 
 ---
 
 ## Open-sourcing checklist
 
-- [x] **Personal notes stripped from history** — `public/daily/*.md` and `public/inbox/*.md` (non-template) purged via `git filter-repo`. Templates in `public/inbox/templates/` retained.
-- [x] **Large binaries stripped from history** — `bin/nvim`, `bin/nvim.bin`, `bin/lazygit`, and `bin/nvim-runtime/` removed. `setup-km.sh` downloads them at install time.
-- [x] **Hardcoded handle replaced** — `CONTRIBUTING.md` now uses `{your-handle}` placeholder.
-- [x] **Release-readiness auditor** — `scripts/check-release-ready.sh` exits non-zero if binaries, personal notes, PII patterns, or secrets are detected.
-- [x] **Nested vault removed** — accidentally-committed `{your-handle}-knowledge-management/` subfolder (a default Obsidian init) removed from HEAD and history.
-- [x] **`config/mpv/mpv.conf` hardcoded path removed** — replaced absolute path with blank + comment instructing users to set their own path.
-- [x] **Stray personal URL removed from README** — trailing personal URL removed from `See Also` section.
-- [x] **`settings.local.json` scrubbed from history** — `.claude/settings.local.json` with absolute machine paths was committed before it was gitignored. Removed via `git filter-repo --invert-paths`; both remotes force-pushed.
-- [x] **README prerequisites section** — added table of `git`, `curl`, `flatpak`, `sudo`, GitHub account before Setup.
-- [x] **README fork-rename clarification** — now explains GitHub Settings → General → Repository name.
-- [x] **README direnv sequencing** — callout added: run `setup-km.sh` before `direnv allow .`.
-- [x] **`scripts/setup-km.sh` comment** — changed "my knowledge management" to generic description.
-- [x] **`.loom/loom.yaml` and `ORCHESTRATOR.md` handle** — replaced hardcoded `awsaavedra-knowledge-management` with `{your-handle}-knowledge-management` placeholder.
+All items complete as of 2026-06-01.
+
+- [x] Personal notes and large binaries stripped from history (`git filter-repo`)
+- [x] Hardcoded handle replaced with `{your-handle}` placeholders throughout (CONTRIBUTING.md, `.loom/loom.yaml`, ORCHESTRATOR.md)
+- [x] Absolute machine paths removed from tracked files (`config/mpv/mpv.conf`, `.claude/settings.local.json` history)
+- [x] Release-readiness auditor added (`scripts/check-release-ready.sh` exits non-zero on PII/secrets)
+- [x] `.gitignore` covers binaries, venv, Claude Code system dirs, loom runtime artifacts
+- [x] README prerequisites, fork-rename, and direnv sequencing clarified
+- [x] `roadmap-features.md` committed and linked from README
+- [x] Both `origin` + `upstream` force-pushed after all history rewrites
 - [ ] **Identity** — commits carry the author name. Intentional if open-sourcing under your own name; otherwise rewrite with `git filter-repo --name-callback` / `--email-callback`.
-- [x] **Force-push** — after all history rewrites, force-push to both `origin` and `upstream` (the source template repo).
 
 ---
 
@@ -591,5 +549,6 @@ Port slow Bash/Python utilities (fuzz harness, `okm audit`, large TODO scans) to
 
 - [`docs/ai-instructions.md`](docs/ai-instructions.md) — AI assistant rules
 - [`docs/skills/README.md`](docs/skills/README.md) — AI skills library
+- [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md) — N/B code index (design decisions and edge cases)
 - [`scripts/README.md`](scripts/README.md) — cron job docs
 - [`scripts/setup-km.sh`](scripts/setup-km.sh) — canonical source for versions and defaults
