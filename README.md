@@ -259,7 +259,7 @@ git add .gitattributes && git commit -m "configure git-crypt"
 | **v2** | 🔵 planned | Media ingest, macOS, encryption, performance |
 | **v3** | 🔵 planned | Portable Vault Specification (PVS) |
 
-Full item lists: [`roadmap-features.md`](roadmap-features.md). v1 specs + reproduction steps: `tests/v1_spec.bats`. v0 shipped clusters and regression guard: [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md). Fork-safety architecture: [`docs/DESIGN_NOTES.md#fork-safety-architecture`](docs/DESIGN_NOTES.md#fork-safety-architecture).
+Full item lists: [`docs/roadmap.md`](docs/roadmap.md). v1 specs + reproduction steps: `tests/v1_spec.bats`. v0 shipped clusters and regression guard: [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md). Fork-safety architecture: [`docs/DESIGN_NOTES.md#fork-safety-architecture`](docs/DESIGN_NOTES.md#fork-safety-architecture).
 
 ---
 
