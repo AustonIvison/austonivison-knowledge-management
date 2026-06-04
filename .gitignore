@@ -27,6 +27,9 @@ bin/nvim.bin
 bin/nvim-runtime/
 bin/lazygit
 
+# Stray NVIM_APPNAME self-symlink artifact (absolute path → leaks home dir if committed)
+config/nvim/nvim
+
 # Vault notes (excluded when KM_TRACK_NOTES=false; templates always kept)
 public/inbox/*.md
 !public/inbox/templates/
