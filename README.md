@@ -133,6 +133,8 @@ Vault follows [PARA](https://fortelabs.com/blog/para/). All agent/loom output be
 | `okm capture [text]` | Timestamped quick-capture note |
 | `okm spot <url>` | Create note from Spotify link (episode, track, album, playlist) |
 | `okm yt <url>` | Create dated note from a YouTube link; prints its path; offers `yt-dlp` title/transcript fetch |
+| `okm pod <file> [title]` | Create dated note from a local audio/video file; transcribes via whisperX when installed |
+| `okm distill <note>` | Write an AI bullet summary alongside a note (`--model claude\|ollama`) |
 | `okm open [path]` | Open a note or launch fzf picker |
 | `okm grep <pattern>` | ripgrep across all `.md` files |
 | `okm files [pattern]` | List `.md` paths, optionally filtered |
@@ -176,8 +178,8 @@ Config via `NVIM_APPNAME=km` → `~/.config/km/`. Global `~/.config/nvim` unaffe
 |---|---|---|
 | YouTube | `okm yt <URL>` | Shipped (transcript fetch needs `yt-dlp`) |
 | Spotify | `okm spot <URL>` | Shipped |
-| Local audio | `okm pod <file> "Title"` | **Planned** |
-| Summarise | `okm distill <note>` (Claude / Ollama) | **Planned** |
+| Local audio | `okm pod <file> "Title"` | Shipped (transcription needs whisperX; offline scaffold otherwise) |
+| Summarise | `okm distill <note>` (Claude / Ollama) | Shipped (needs `claude` CLI or `ollama`) |
 
 Tools: yt-dlp, spotdl, whisperX (large-v3-turbo), ffmpeg, mpv (`s` key → screenshot to `attachments/`).
 
@@ -192,7 +194,7 @@ Tools: yt-dlp, spotdl, whisperX (large-v3-turbo), ffmpeg, mpv (`s` key → scree
 | `daily-template.md` | `okm today` |
 | `note-template.md` | `okm new` |
 | `capture-template.md` | `okm capture` |
-| `yt-template.md` / `podcast-template.md` | `okm yt` (shipped) / `okm pod` (planned) |
+| `yt-template.md` / `podcast-template.md` | `okm yt` / `okm pod` |
 | `spotify-episode-template.md` / `spotify-track-template.md` | `okm spot` |
 | `todo-summary-template.md` / `weekly-template.md` | cron scripts |
 | `archive-template.md` | manual |
@@ -257,9 +259,9 @@ git add .gitattributes && git commit -m "configure git-crypt"
 | Version | Status | Theme |
 |---|---|---|
 | **v0** | ✅ shipped | Core vault CLI, privacy boundary, hardened input |
-| **v1** | 🟡 in design | Fork-safety, edge-case bugs, tagging gaps |
-| **v2** | 🔵 planned | Media ingest, macOS, encryption, performance |
-| **v3** | 🔵 planned | Portable Vault Specification (PVS) |
+| **v1** | ✅ shipped (tagged `v1.0.0`) | Fork-safety, edge-case bugs, tagging gaps |
+| **v2** | 🟡 in progress | Media ingest (`okm pod`, `okm distill` shipped), encryption, performance |
+| **v3** | 🔵 planned | macOS support, Portable Vault Specification (PVS) |
 
 Full item lists: [`docs/roadmap.md`](docs/roadmap.md). Project-structure simplification plan (root keeps `README.md` only; all other markdown moves to `docs/`): [`docs/roadmap.md#project-structure-simplification`](docs/roadmap.md#project-structure-simplification). v1 specs + reproduction steps: `tests/v1_spec.bats`. v0 shipped clusters and regression guard: [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md). Fork-safety architecture: [`docs/DESIGN_NOTES.md#fork-safety-architecture`](docs/DESIGN_NOTES.md#fork-safety-architecture).
 
