@@ -4,6 +4,32 @@
 
 ---
 
+## Version Map
+
+How the phases below and the README roadmap themes land in tagged versions.
+
+### v1 — shipped (tagged `v1.0.0`, 2026-06-09)
+
+Fork-safety, edge-case bugs, tagging gaps. Specs and reproduction steps: `tests/v1_spec.bats`.
+
+### v2 — in progress
+
+| Item | Status |
+|---|---|
+| `okm pod <file>` — local audio note, whisperX transcription | ✅ shipped |
+| `okm distill <note>` — AI bullet summary (Claude / Ollama) | ✅ shipped |
+| Encryption — `okm crypt init` (git-crypt) | ✅ shipped; remaining: document key backup/restore workflow |
+| Performance — Rust mirrors per README performance policy | Open; only mirror what crosses the >1s / hot-loop bar |
+| Phase 1 below (`doctor`, `--dry-run`, `eject-check`, schema) | Open; candidate v2 scope — no AI required, low effort |
+
+### v3 — planned
+
+- **macOS support** — *postponed from v2 (2026-06-09): no Mac hardware to test against, and macOS behavior can't be faithfully simulated on Linux.* Scope when picked up: Homebrew package install path in `scripts/setup-km.sh` (a draft `install_brew_packages` helper was written and reverted — trivial to recreate), BSD vs GNU userland differences (`sed -i`, `date`, `realpath`), and `open` vs `xdg-open`/flatpak launchers.
+- **Portable Vault Specification (PVS)** — see `docs/PVS.md`; includes the tool/vault repo split deferred from the structure plan below.
+- Phases 2–3 below (agent legibility, synthesis layer) slot into v3+ as design firms up.
+
+---
+
 ## Phase 1 — Trust Infrastructure (Foundation)
 
 These features make the vault auditable and safe. No AI required. Ship these first.
