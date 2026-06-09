@@ -2,10 +2,10 @@
 # Tests for the scheduled cron job configuration.
 #
 # Validates:
-#   - The documented cron schedule (7:00, 12:00, 15:00 daily) is consistent
 #   - The cron-invoked command (todo-summary.sh --output) works correctly
 #   - Same-day re-runs replace (not duplicate) today's section
 #   - The yearly file uses carry-forward for unchecked items
+# F7: Tests assert behavioral output only — not documentation schedule strings.
 
 load 'helpers/test_helper'
 
@@ -29,35 +29,7 @@ setup() {
     chmod +x "${TEST_TEMP_DIR}/todo-summary.sh"
 }
 
-# === Documentation consistency ===
-
-@test "scripts/README.md documents all 3 cron times" {
-    for hour in "${EXPECTED_HOURS[@]}"; do
-        grep -q "3 ${hour} \* \* \*" "${PROJECT_ROOT}/scripts/README.md"
-    done
-}
-
-@test "scripts/README.md mentions 07:00, 12:00, and 15:00" {
-    grep -q '07:00.*12:00.*15:00' "${PROJECT_ROOT}/scripts/README.md"
-}
-
-@test "README.md mentions 07:00, 12:00, and 15:00" {
-    grep -q '07:00.*12:00.*15:00' "${PROJECT_ROOT}/README.md"
-}
-
-@test "todo-summary.sh header mentions all 3 times" {
-    grep -q '07:00.*12:00.*15:00' "${PROJECT_ROOT}/scripts/todo-summary.sh"
-}
-
-@test "no stale 2-time schedule references remain in scripts/README.md" {
-    ! grep -qi 'twice daily' "${PROJECT_ROOT}/scripts/README.md"
-}
-
-@test "no stale 2-time schedule references remain in README.md" {
-    ! grep -qi 'twice daily' "${PROJECT_ROOT}/README.md"
-}
-
-# === Cron expression validity ===
+# === Cron expression validity (constant assertions, no doc-string dependency) ===
 
 @test "cron expressions use minute 3 (off-peak)" {
     for cron in "${EXPECTED_CRON_LINES[@]}"; do
@@ -71,10 +43,12 @@ setup() {
     done
 }
 
-@test "exactly 3 crontab entries documented in scripts/README.md" {
-    local count
-    count=$(grep -c '^\(3 [0-9]\+ \* \* \*\)' "${PROJECT_ROOT}/scripts/README.md" || true)
-    [ "$count" -eq 3 ]
+@test "todo-summary.sh header mentions all 3 schedule times" {
+    grep -q '07:00.*12:00.*15:00' "${PROJECT_ROOT}/scripts/todo-summary.sh"
+}
+
+@test "3 expected schedule hours defined" {
+    [ "${#EXPECTED_HOURS[@]}" -eq 3 ]
 }
 
 # === Cron-invoked command behavior ===
@@ -145,9 +119,9 @@ setup() {
 
 # === Cron script path ===
 
-@test "documented crontab command references todo-summary.sh --output" {
-    grep -q 'todo-summary.sh --output' "${PROJECT_ROOT}/scripts/README.md"
-    grep -q 'todo-summary.sh --output' "${PROJECT_ROOT}/README.md"
+@test "todo-summary.sh accepts --output flag" {
+    run bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
+    assert_success
 }
 
 @test "todo-summary.sh is executable" {

@@ -18,6 +18,9 @@ EDITOR_CMD="${EDITOR:-vim}"
 DAILY_DIR="${OBSIDIAN_DAILY_DIR:-public/daily}"
 NOTES_DIR="${OBSIDIAN_NOTES_DIR:-public/inbox}"
 
+OKM_VERSION="1.0.0"
+KM_TRACK_NOTES="${KM_TRACK_NOTES:-true}"
+
 # Privacy: by default, read-side commands (grep, tags, files, tagged, recent)
 # skip private/ folder so screen-shared `okm grep` can't surface private
 # notes. Set KM_INCLUDE_PRIVATE=1 to opt in to scanning private folders.
@@ -39,20 +42,25 @@ Usage:
   okm open [path]
   okm new <title> [-t tag1,tag2]
   okm capture [text] [-t tag1,tag2]
-  okm today
+  okm today [-t tag1,tag2]
   okm spot <spotify-url> [-t tag1,tag2]
   okm yt <youtube-url> [-t tag1,tag2]
   okm grep <pattern>
   okm files [substring]
   okm recent
-  okm sync [message]
-  okm tags [note]
+  okm sync [-m message]
+  okm tags [note] [--json]
   okm tag <note> <tag> [...]
   okm untag <note> <tag> [...]
   okm tagged <tag>
-  okm audit [--code-only|--vault-only] [--paths PATH...] [--quiet]
+  okm rename-tag <old> <new>
+  okm audit [--code-only|--vault-only] [--paths PATH...] [--quiet] [--json]
+  okm private <new|today|capture> [args...]
+  okm crypt init
+  okm port <github-handle> [--no-push]
   okm obs
   okm path
+  okm version
 EOF
 }
 
@@ -81,12 +89,13 @@ slugify() {
 
 # N13+N26: escape backslashes then double-quotes in YAML double-quoted scalars.
 # Backslash must be escaped first so we don't double-escape the quote escapes.
-# Newlines/CRs are stripped to prevent YAML frontmatter injection.
+# Newlines/CRs/tabs are stripped to prevent YAML frontmatter injection.
 yaml_escape_dq() {
   local s="${1//\\/\\\\}"
   s="${s//\"/\\\"}"
   s="${s//$'\n'/ }"
   s="${s//$'\r'/}"
+  s="${s//$'\t'/ }"
   printf '%s' "$s"
 }
 
@@ -308,7 +317,14 @@ list_vault_md_files() {
 
 # List all tags across the vault with counts, or show tags for a specific note.
 list_tags() {
-  local note="${1:-}"
+  local json=false note=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --json) json=true; shift ;;
+      *) note="$1"; shift ;;
+    esac
+  done
+
   if [ -n "$note" ]; then
     local file
     file="$(resolve_note "$note")"
@@ -324,13 +340,31 @@ list_tags() {
   local files
   files="$(list_vault_md_files)"
   [ -n "$files" ] || return 0
-  while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    read_file_tags "$f"
-  done <<< "$files" \
-    | sed '/^$/d' \
-    | sort | uniq -c | sort -rn \
-    | awk '{printf "%-4d %s\n", $1, $2}'
+  local counts
+  counts="$(
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      read_file_tags "$f"
+    done <<< "$files" \
+      | sed '/^$/d' \
+      | sort | uniq -c | sort -rn
+  )"
+  if $json; then
+    printf '[\n'
+    local first=true
+    while IFS= read -r line; do
+      [ -n "$line" ] || continue
+      local count tag
+      count="$(printf '%s' "$line" | awk '{print $1}')"
+      tag="$(printf '%s' "$line" | awk '{$1=""; sub(/^ /,"",$0); print}')"
+      $first || printf ',\n'
+      printf '  {"tag":"%s","count":%s}' "$tag" "$count"
+      first=false
+    done <<< "$counts"
+    printf '\n]\n'
+  else
+    printf '%s\n' "$counts" | awk '{printf "%-4d %s\n", $1, $2}'
+  fi
 }
 
 # Add tags to a note. Validates each tag, refuses block-style files, and
@@ -432,6 +466,7 @@ remove_tags() {
 # List notes with a specific tag. Uses parsed-tag equality, not regex match,
 # so `okm tagged source` does NOT also match `source/spotify` (B2), and
 # `okm tagged '.*'` is just an invalid tag, not a regex (N17).
+# B3: block-style YAML files are included via read_file_tags but we warn if any exist.
 list_tagged() {
   local tag="${1:-}"
   [ -n "$tag" ] || { echo "Tag required" >&2; exit 1; }
@@ -441,9 +476,12 @@ list_tagged() {
   files="$(list_vault_md_files)"
   [ -n "$files" ] || return 0
 
-  local out=""
+  local out="" block_skipped=0
   while IFS= read -r f; do
     [ -n "$f" ] || continue
+    if has_block_style_tags "$f"; then
+      block_skipped=$((block_skipped + 1))
+    fi
     local tags
     tags="$(read_file_tags "$f")"
     [ -n "$tags" ] || continue
@@ -454,6 +492,9 @@ list_tagged() {
   done <<< "$files"
   if [ -n "$out" ]; then
     printf '%s\n' "$out" | sort
+  fi
+  if [ "$block_skipped" -gt 0 ]; then
+    echo "${block_skipped} note(s) with block-style tags skipped (v1)" >&2
   fi
 }
 
@@ -594,14 +635,16 @@ EOF
 
 today_note() {
   ensure_dirs
+  parse_tag_flag "$@"
   local d file
   d="$(date +%F)"
   file="$VAULT/$DAILY_DIR/$d.md"
+  local tags_yaml; tags_yaml="$(_tags_yaml "daily")"
   [ -f "$file" ] || cat > "$file" <<EOF
 ---
 date: $d
 created: $(iso_now)
-tags: [daily]
+tags: ${tags_yaml}
 ---
 
 # $d
@@ -640,13 +683,21 @@ files_vault() {
 
 recent_notes() {
   need_cmd fzf
-  local picked
-  picked="$(
+  local picked file_list find_errs
+  find_errs="$(mktemp 2>/dev/null || echo "/tmp/okm-recent-errs-$$")"
+  file_list="$(
     { find "$VAULT" -type f -name '*.md' "${PRIVATE_FIND_PRUNE[@]}" \
-          -exec stat --format='%Y %n' {} + 2>/dev/null \
+          -exec stat --format='%Y %n' {} + 2>"$find_errs" \
       || find "$VAULT" -type f -name '*.md' "${PRIVATE_FIND_PRUNE[@]}" \
-          -print0 | xargs -0 stat -f '%m %N' 2>/dev/null
-    } \
+          -print0 2>>"$find_errs" | xargs -0 stat -f '%m %N' 2>/dev/null
+    }
+  )" || true
+  if [ -s "$find_errs" ]; then
+    echo "okm recent: warn — some vault directories may be unreadable: $VAULT" >&2
+  fi
+  rm -f "$find_errs" 2>/dev/null || true
+  picked="$(
+    printf '%s\n' "$file_list" \
       | sort -nr \
       | head -200 \
       | cut -d' ' -f2- \
@@ -662,14 +713,39 @@ recent_notes() {
 }
 
 sync_git() {
+  # Parse -m flag for custom commit message.
+  local msg="" args=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -m) shift; msg="${1:-}"; shift ;;
+      *)  args+=("$1"); shift ;;
+    esac
+  done
+  # Remaining positional args treated as legacy bare message (okm sync "my msg").
+  if [ -z "$msg" ] && [ ${#args[@]} -gt 0 ]; then
+    msg="${args[*]}"
+  fi
+  msg="${msg:-vault sync $(date '+%F %T')}"
+
   git -C "$VAULT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
     echo "Vault is not a git repo" >&2
     exit 1
   }
 
+  # Upstream guard: refuse to push if origin still points at the public OSS repo.
+  local origin_url
+  origin_url="$(git -C "$VAULT" remote get-url origin 2>/dev/null || true)"
+  if [ -n "$origin_url" ]; then
+    local blocklist="${KM_UPSTREAM_PATTERN:-knowledge-management}"
+    if [[ "$origin_url" =~ $blocklist ]] && [[ "${KM_ALLOW_UPSTREAM_PUSH:-0}" != "1" ]]; then
+      echo "okm sync: refusing — origin looks like the public upstream repo." >&2
+      echo "  origin: $origin_url" >&2
+      echo "  Run 'okm port <handle>' to set up your private fork, or set KM_ALLOW_UPSTREAM_PUSH=1 to override." >&2
+      exit 1
+    fi
+  fi
+
   # N15: refuse to sync if any symlink in the vault points outside the vault.
-  # Such symlinks are usually accidental (e.g. a user `ln -s`d a file in to
-  # read it in Obsidian) and would otherwise leak the target path on push.
   local vault_real bad_links=""
   vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
   if [ -n "$vault_real" ]; then
@@ -691,7 +767,25 @@ sync_git() {
     exit 1
   fi
 
-  local msg="${*:-vault sync $(date '+%F %T')}"
+  # Extension guard: warn and abort on suspicious file types before staging.
+  if [ "${KM_FORCE_SYNC:-0}" != "1" ]; then
+    local suspicious
+    suspicious="$(git -C "$VAULT" diff --name-only HEAD -- \
+      '*.env' '*.pem' '*.key' '*.crt' '*.db' '*.sqlite' '*.exe' '*.dll' '*.so' '*.dylib' \
+      '.env' 2>/dev/null || true)"
+    # Also check untracked suspicious files
+    local untracked_susp
+    untracked_susp="$(git -C "$VAULT" ls-files --others --exclude-standard 2>/dev/null \
+      | grep -E '\.(env|pem|key|crt|db|sqlite|exe|dll|so|dylib)$|^\.env$' || true)"
+    local all_susp="${suspicious}${untracked_susp}"
+    if [ -n "$all_susp" ]; then
+      echo "okm sync: suspicious files detected — refusing to stage:" >&2
+      printf '%s\n' "$all_susp" | sed 's/^/  /' >&2
+      echo "Set KM_FORCE_SYNC=1 to override." >&2
+      exit 1
+    fi
+  fi
+
   git -C "$VAULT" add -A
   if git -C "$VAULT" diff --cached --quiet; then
     echo "No changes to commit"
@@ -702,8 +796,6 @@ sync_git() {
   upstream="$(git -C "$VAULT" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
   if [ -n "$upstream" ]; then
     # Privacy gate: refuse to push if the remote is a public GitHub repo.
-    # This is a second line of defence after the pre-push hook — it fires
-    # even when the hook is missing (e.g. a freshly cloned vault).
     if ! km_check_remote_is_private "$VAULT"; then
       echo "okm sync: push aborted — see PRIVACY messages above." >&2
       exit 1
@@ -740,11 +832,16 @@ _SPOT_ARTIST="" _SPOT_TITLE=""
 _spotify_fetch_metadata() {
   _SPOT_ARTIST=""; _SPOT_TITLE=""
   local url="$1" spot_type="$2"
-  [ "$spot_type" != "episode" ] && [ "$spot_type" != "show" ] && \
-    command -v spotdl >/dev/null 2>&1 || return 0
+  command -v spotdl >/dev/null 2>&1 || {
+    echo "okm spot requires network access to fetch Spotify metadata. Continuing with offline scaffold." >&2
+    return 0
+  }
   local meta
   meta="$(spotdl save "$url" --output "{artist} - {title}" 2>/dev/null | head -1 || true)"
-  [ -n "$meta" ] || return 0
+  if [ -z "$meta" ]; then
+    echo "okm spot requires network access to fetch Spotify metadata. Continuing with offline scaffold." >&2
+    return 0
+  fi
   _SPOT_ARTIST="$(printf '%s' "$meta" | sed 's/ - .*//')"
   _SPOT_TITLE="$(printf '%s' "$meta" | sed 's/^[^-]*- //')"
 }
@@ -809,7 +906,7 @@ tags: ${tags_yaml}
 
 ## Player
 
-[Listen on Spotify](${url})
+[Listen on Spotify](<${url}>)
 
 <iframe src="${embed_url}" width="100%" height="352" frameBorder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
 
@@ -854,7 +951,7 @@ tags: ${tags_yaml}
 
 ## Player
 
-[Listen on Spotify](${url})
+[Listen on Spotify](<${url}>)
 
 <iframe src="${embed_url}" width="100%" height="352" frameBorder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
 
@@ -1118,13 +1215,14 @@ _audit_check_file() {
 }
 
 audit_run() {
-  local code_only=false vault_only=false quiet=false
+  local code_only=false vault_only=false quiet=false json=false
   local restrict_paths=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --code-only)  code_only=true;  shift ;;
       --vault-only) vault_only=true; shift ;;
       --quiet)      quiet=true;      shift ;;
+      --json)       json=true;       shift ;;
       --paths)
         shift
         while [ $# -gt 0 ] && [[ "$1" != --* ]]; do
@@ -1166,6 +1264,37 @@ audit_run() {
   local findings=0
   [ -n "$out" ] && findings="$(printf '%s\n' "$out" | grep -c .)"
 
+  if $json; then
+    local secrets=0 para=0 filenames=0
+    local json_findings="["
+    local first_finding=true
+    if [ -n "$out" ]; then
+      while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        local fpath fline fdesc jtype
+        fpath="$(printf '%s' "$line" | cut -d: -f1)"
+        fline="$(printf '%s' "$line" | cut -d: -f2)"
+        fdesc="$(printf '%s' "$line" | cut -d: -f3- | sed 's/^ //')"
+        case "$fdesc" in
+          secret-pattern*)     jtype="secret";   secrets=$((secrets+1)) ;;
+          para-content*)       jtype="para";     para=$((para+1)) ;;
+          vault-content*)      jtype="para";     para=$((para+1)) ;;
+          sensitive-filename*) jtype="filename"; filenames=$((filenames+1)) ;;
+          *)                   jtype="$(printf '%s' "$fdesc" | awk '{print $1}')" ;;
+        esac
+        $first_finding || json_findings+=","
+        json_findings+="$(printf '\n  {"type": "%s", "file": "%s", "line": %s, "match": "%s"}' \
+          "$jtype" "$fpath" "$fline" "$fdesc")"
+        first_finding=false
+      done <<< "$out"
+    fi
+    json_findings+=$'\n]'
+    printf '{"findings":%s,"summary":{"total":%s,"secrets":%s,"para":%s,"filenames":%s}}\n' \
+      "$json_findings" "$findings" "$secrets" "$para" "$filenames"
+    [ "$findings" -eq 0 ]
+    return $?
+  fi
+
   if [ "$findings" -eq 0 ]; then
     if ! $quiet; then
       local count
@@ -1182,24 +1311,175 @@ audit_run() {
   return 1
 }
 
+rename_tag() {
+  local old_tag="${1:-}" new_tag="${2:-}"
+  [ -n "$old_tag" ] || { echo "Old tag required" >&2; exit 1; }
+  [ -n "$new_tag" ] || { echo "New tag required" >&2; exit 1; }
+  validate_tag "$old_tag" || exit 1
+  validate_tag "$new_tag" || exit 1
+
+  local files
+  files="$(list_vault_md_files)"
+  [ -n "$files" ] || return 0
+
+  local updated=0
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    local tags
+    tags="$(read_file_tags "$f")"
+    [ -n "$tags" ] || continue
+    if printf '%s\n' "$tags" | grep -qxF -- "$old_tag"; then
+      require_inline_tags "$f" || continue
+      local new_tags
+      new_tags="$(printf '%s\n' "$tags" | grep -vxF -- "$old_tag" || true)"
+      new_tags="${new_tags:+${new_tags}
+}${new_tag}"
+      local new_yaml
+      new_yaml="$(build_tags_yaml "$new_tags")"
+      write_tags_line "$f" "$new_yaml"
+      updated=$((updated + 1))
+    fi
+  done <<< "$files"
+  echo "Renamed tag '$old_tag' → '$new_tag' in $updated file(s)"
+}
+
+private_cmd() {
+  local sub="${1:-}"
+  shift || true
+  case "$sub" in
+    new)
+      NOTES_DIR="private/inbox" new_note "$@" ;;
+    today)
+      DAILY_DIR="private/daily" NOTES_DIR="private/inbox" today_note "$@" ;;
+    capture)
+      NOTES_DIR="private/inbox" capture_note "$@" ;;
+    *)
+      echo "okm private: unknown subcommand '$sub'" >&2
+      echo "Usage: okm private <new|today|capture> [args...]" >&2
+      exit 1 ;;
+  esac
+}
+
+crypt_cmd() {
+  local sub="${1:-}"
+  shift || true
+  case "$sub" in
+    init)
+      command -v git-crypt >/dev/null 2>&1 || {
+        echo "git-crypt is not installed. Install it with: sudo apt install git-crypt" >&2
+        exit 1
+      }
+      git -C "$VAULT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+        echo "okm crypt: vault is not a git repo" >&2
+        exit 1
+      }
+      git-crypt -C "$VAULT" init
+      local ga="$VAULT/.gitattributes"
+      grep -q 'daily/\*.md filter=git-crypt' "$ga" 2>/dev/null || \
+        printf 'public/daily/*.md filter=git-crypt diff=git-crypt\n' >> "$ga"
+      grep -q 'inbox/\*.md filter=git-crypt' "$ga" 2>/dev/null || \
+        printf 'public/inbox/*.md filter=git-crypt diff=git-crypt\n' >> "$ga"
+      local key="${HOME}/git-crypt-km.key"
+      git-crypt -C "$VAULT" export-key "$key"
+      echo "git-crypt initialised. Key exported to: $key"
+      echo "WARNING: Back up $key — key loss = permanent data loss." >&2
+      echo "Next: git add .gitattributes && git commit -m 'configure git-crypt'"
+      ;;
+    *)
+      echo "okm crypt: unknown subcommand '$sub'" >&2
+      echo "Usage: okm crypt init" >&2
+      exit 1 ;;
+  esac
+}
+
+port_cmd() {
+  local handle="${1:-}"
+  [ -n "$handle" ] || { echo "GitHub handle required" >&2; exit 1; }
+  local no_push=false
+  for arg in "$@"; do
+    [ "$arg" = "--no-push" ] && no_push=true
+  done
+
+  git -C "$VAULT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+    echo "okm port: vault is not a git repo" >&2
+    exit 1
+  }
+
+  # Require clean working tree.
+  if [ -n "$(git -C "$VAULT" status --porcelain 2>/dev/null)" ]; then
+    echo "okm port: working tree is not clean. Commit or stash changes first." >&2
+    exit 1
+  fi
+
+  local new_repo="${handle}-knowledge-management"
+
+  # Rename origin → upstream and disable upstream push.
+  if git -C "$VAULT" remote get-url origin >/dev/null 2>&1; then
+    git -C "$VAULT" remote rename origin upstream
+    git -C "$VAULT" remote set-url --push upstream DISABLED
+  fi
+
+  # Add new private origin.
+  local new_url="git@github.com:${handle}/${new_repo}.git"
+  git -C "$VAULT" remote add origin "$new_url" 2>/dev/null || \
+    git -C "$VAULT" remote set-url origin "$new_url"
+
+  # Install pre-push hook.
+  local git_dir hook_dir
+  git_dir="$(git -C "$VAULT" rev-parse --git-dir 2>/dev/null || echo ".git")"
+  [[ "$git_dir" = /* ]] || git_dir="$VAULT/$git_dir"
+  hook_dir="${git_dir}/hooks"
+  mkdir -p "$hook_dir"
+  cat > "$hook_dir/pre-push" <<'HOOK'
+#!/usr/bin/env bash
+# Installed by okm port. Blocks pushes to the public OSS upstream.
+REMOTE_URL="$2"
+BLOCKLIST="${KM_UPSTREAM_PATTERN:-knowledge-management}"
+if [[ "$REMOTE_URL" =~ $BLOCKLIST ]]; then
+  if [[ "${KM_ALLOW_UPSTREAM_PUSH:-0}" != "1" ]]; then
+    echo "ERROR: push to upstream OSS blocked. Remote: $REMOTE_URL" >&2
+    echo "Override: KM_ALLOW_UPSTREAM_PUSH=1 git push ..." >&2
+    exit 1
+  fi
+fi
+HOOK
+  chmod 755 "$hook_dir/pre-push"
+
+  if ! $no_push; then
+    command -v gh >/dev/null 2>&1 && \
+      gh repo create "$new_repo" --private --clone=false 2>/dev/null || true
+    git -C "$VAULT" push -u origin main
+  fi
+
+  echo "okm port: done."
+  echo "  origin  → git@github.com:${handle}/${new_repo}.git"
+  echo "  upstream push → DISABLED"
+  echo "  pre-push hook → installed"
+}
+
 case "${1:-help}" in
   open) shift; open_note "${1:-}" ;;
   new) shift; new_note "$@" ;;
   capture) shift; capture_note "$@" ;;
-  today) shift; today_note ;;
+  today) shift; today_note "$@" ;;
   spot) shift; spot_note "$@" ;;
   yt) shift; yt_note "$@" ;;
   grep) shift; grep_vault "${1:-}" ;;
   files) shift; files_vault "${1:-}" ;;
   recent) shift; recent_notes ;;
-  sync) shift; sync_git "$*" ;;
-  tags) shift; list_tags "${1:-}" ;;
+  sync) shift; sync_git "$@" ;;
+  tags) shift; list_tags "$@" ;;
   tag) shift; add_tags "$@" ;;
   untag) shift; remove_tags "$@" ;;
   tagged) shift; list_tagged "${1:-}" ;;
+  rename-tag) shift; rename_tag "$@" ;;
   audit) shift; audit_run "$@" ;;
+  private) shift; private_cmd "$@" ;;
+  crypt) shift; crypt_cmd "$@" ;;
+  port) shift; port_cmd "$@" ;;
   obs) shift; open_obsidian ;;
   path) printf '%s\n' "$VAULT" ;;
+  version|--version) printf 'okm v%s\n' "$OKM_VERSION" ;;
   help|-h|--help) usage ;;
   *) usage; exit 1 ;;
 esac

@@ -282,6 +282,28 @@ else
     _fail "env.sh missing at ${SCRIPT_DIR}/env.sh"
 fi
 
+# N6: warn when project dir and vault dir resolve to the same path (co-located).
+_project_real="$(realpath -- "${SCRIPT_DIR}" 2>/dev/null || true)"
+_vault_real="$(realpath -- "${VAULT_DIR}" 2>/dev/null || true)"
+if [ -n "${_project_real}" ] && [ "${_project_real}" = "${_vault_real}" ]; then
+    _warn "vault and project are co-located (same directory: ${_project_real}). Set OBSIDIAN_VAULT to separate them."
+else
+    _pass "vault and project are separate directories"
+fi
+unset _project_real _vault_real
+
+# N8: check direnv is installed and .envrc is allowed.
+if command -v direnv >/dev/null 2>&1; then
+    _pass "direnv installed ($(command -v direnv))"
+    if direnv status 2>/dev/null | grep -q 'Found RC allowed'; then
+        _pass "direnv: .envrc is allowed"
+    elif [ -f "${SCRIPT_DIR}/.envrc" ]; then
+        _warn "direnv: .envrc not allowed — run: direnv allow . to activate auto-loading"
+    fi
+else
+    _warn "direnv not installed — run: sudo apt install direnv (or see https://direnv.net/); auto-activation will not work"
+fi
+
 # Check that env.sh did NOT modify ~/.zshrc
 if [ -f "${HOME}/.zshrc" ]; then
     if grep -qF 'OBSIDIAN_VAULT' "${HOME}/.zshrc" 2>/dev/null; then

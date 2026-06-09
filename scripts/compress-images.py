@@ -123,7 +123,8 @@ def convert_image(path, dry_run=False, keep=False):
     new_size = os.path.getsize(out)
 
     try:
-        Image.open(out).verify()
+        with Image.open(out) as img:
+            img.verify()
     except Exception:
         os.remove(out)
         return "error: converted file is corrupt"

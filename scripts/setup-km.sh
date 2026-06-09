@@ -8,6 +8,19 @@ LOG_DIR="${HOME}/.local/log"
 LOG_FILE="${LOG_DIR}/setup-km-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "${LOG_DIR}"
 
+# Rotate: keep only the last 5 log files.
+_rotate_logs() {
+    local logs
+    mapfile -t logs < <(find "${LOG_DIR}" -maxdepth 1 -name 'setup-km-*.log' \
+        -not -name "$(basename "${LOG_FILE}")" | sort -r)
+    local i=0
+    for f in "${logs[@]}"; do
+        i=$((i + 1))
+        [ "$i" -ge 5 ] && rm -f "$f"
+    done
+}
+_rotate_logs
+
 _log() {
     local level="$1"
     shift
@@ -33,7 +46,18 @@ trap '_on_error ${LINENO}' ERR
 # --- Variables ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="${SCRIPT_DIR}/bin"
-GIT_REMOTE="${1:-}"
+
+# Argument parsing (before sourcing so --dry-run works when sourced).
+DRY_RUN=false
+_setup_args=()
+for _arg in "$@"; do
+    case "$_arg" in
+        --dry-run) DRY_RUN=true ;;
+        *)         _setup_args+=("$_arg") ;;
+    esac
+done
+GIT_REMOTE="${_setup_args[0]:-}"
+unset _arg _setup_args
 
 # --- Shared libraries ---
 # shellcheck source=scripts/lib/platform.sh
@@ -289,9 +313,11 @@ install_nvim() {
     log_info "ACTION: Installing Neovim (latest stable) with runtime"
     local tmp_dir nvim_tarball nvim_dir
     tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "${tmp_dir}"' EXIT
     case "${PLATFORM_OS}" in
         linux)  nvim_tarball="nvim-linux-${PLATFORM_ARCH}.tar.gz"; nvim_dir="nvim-linux-${PLATFORM_ARCH}" ;;
         macos)  nvim_tarball="nvim-macos-${PLATFORM_ARCH}.tar.gz"; nvim_dir="nvim-macos-${PLATFORM_ARCH}" ;;
+        *)      log_error "Unsupported platform: ${PLATFORM_OS}/${PLATFORM_ARCH}"; rm -rf "${tmp_dir}"; return 1 ;;
     esac
     curl -fsSL -o "${tmp_dir}/nvim.tar.gz" \
         "https://github.com/neovim/neovim/releases/latest/download/${nvim_tarball}"
@@ -328,6 +354,7 @@ install_lazygit() {
     log_info "ACTION: Installing lazygit (latest release)"
     local tmp_dir version
     tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "${tmp_dir}"' EXIT
     version="$(curl -fsSL "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" \
         | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')"
     if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -338,10 +365,12 @@ install_lazygit() {
     case "${PLATFORM_OS}" in
         linux)  lg_os="Linux" ;;
         macos)  lg_os="Darwin" ;;
+        *)      log_error "Unsupported platform: ${PLATFORM_OS}/${PLATFORM_ARCH}"; rm -rf "${tmp_dir}"; return 1 ;;
     esac
     case "${PLATFORM_ARCH}" in
         x86_64) lg_arch="x86_64" ;;
         arm64)  lg_arch="arm64" ;;
+        *)      log_error "Unsupported architecture: ${PLATFORM_ARCH}"; rm -rf "${tmp_dir}"; return 1 ;;
     esac
     curl -fsSL -o "${tmp_dir}/lazygit.tar.gz" \
         "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${version}_${lg_os}_${lg_arch}.tar.gz"
@@ -506,6 +535,7 @@ install_nerd_font() {
 
     log_info "ACTION: Installing ${font_family} (required for LazyVim icons)"
     tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "${tmp_dir}"' EXIT
     curl -fsSL -o "${tmp_dir}/font.zip" "${font_url}"
     unzip -oq "${tmp_dir}/font.zip" -d "${tmp_dir}/font"
 
@@ -648,9 +678,16 @@ ensure_obsidian_offline() {
 }
 
 # --- Install steps ---
+# Guard: when sourced (e.g. in tests), only define functions — don't execute.
+[[ "${BASH_SOURCE[0]}" != "${0}" ]] && return 0
 
 log_info "==> Detecting platform"
 detect_platform
+
+if $DRY_RUN; then
+    log_info "DRY RUN: skipping all installation steps"
+    exit 0
+fi
 
 log_info "==> Installing packages"
 install_apt_packages vim git ripgrep fzf xdg-utils flatpak xclip wl-clipboard curl unzip \
