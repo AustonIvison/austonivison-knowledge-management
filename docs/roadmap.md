@@ -25,7 +25,7 @@ Fork-safety, edge-case bugs, tagging gaps. Specs and reproduction steps: `tests/
 ### v3 — planned
 
 - **macOS support** — *postponed from v2 (2026-06-09): no Mac hardware to test against, and macOS behavior can't be faithfully simulated on Linux.* Scope when picked up: Homebrew package install path in `scripts/setup-km.sh` (a draft `install_brew_packages` helper was written and reverted — trivial to recreate), BSD vs GNU userland differences (`sed -i`, `date`, `realpath`), and `open` vs `xdg-open`/flatpak launchers.
-- **Portable Vault Specification (PVS)** — see `docs/PVS.md`; includes the tool/vault repo split deferred from the structure plan below.
+- **Portable Vault Specification (PVS)** — see `docs/pvs.md`; includes the tool/vault repo split deferred from the structure plan below.
 - Phases 2–3 below (agent legibility, synthesis layer) slot into v3+ as design firms up.
 
 ---

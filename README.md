@@ -6,7 +6,7 @@
 
 Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI — file-native, offline-first, continuously tested. Treats notes like code: plain Markdown, local files, terminal workflows, composable CLI. AI is optional and layered on top.
 
-**Design principles:** instant startup; fresh local indexing; composable CLI (pipes, JSON, CI); non-destructive by default; no lock-in; small memorable command surface; editor/toolchain interop; local-first; lightweight; **ejectable** — every note readable with `cat`/`grep`/any CommonMark renderer, vault survives Obsidian disappearing (see [PVS](docs/PVS.md)).
+**Design principles:** instant startup; fresh local indexing; composable CLI (pipes, JSON, CI); non-destructive by default; no lock-in; small memorable command surface; editor/toolchain interop; local-first; lightweight; **ejectable** — every note readable with `cat`/`grep`/any CommonMark renderer, vault survives Obsidian disappearing (see [PVS](docs/pvs.md)).
 
 ---
 
@@ -90,8 +90,8 @@ Seeded files: `public/daily/demo-YYYY-MM-DD.md` · `public/inbox/demo-{meeting-n
 ├── config/{lazygit,mpv,vim}/
 ├── docs/ai-instructions.md         # AI assistant rules
 ├── docs/skills/                    # AI skills (argumentation, debug, research, …)
-├── docs/PVS.md                     # Portable Vault Specification
-├── docs/DESIGN_NOTES.md            # N/B code index, fork-safety design
+├── docs/pvs.md                     # Portable Vault Specification
+├── docs/design-notes.md            # N/B code index, fork-safety design
 ├── scripts/setup-km.sh             # install and configure
 ├── scripts/verify-km.sh            # post-install checks
 ├── scripts/{todo-summary,weekly-tasks}.sh   # cron scanners
@@ -263,7 +263,7 @@ git add .gitattributes && git commit -m "configure git-crypt"
 | **v2** | 🟡 in progress | Media ingest (`okm pod`, `okm distill` shipped), encryption, performance |
 | **v3** | 🔵 planned | macOS support, Portable Vault Specification (PVS) |
 
-Full item lists: [`docs/roadmap.md`](docs/roadmap.md). Project-structure simplification plan (root keeps `README.md` only; all other markdown moves to `docs/`): [`docs/roadmap.md#project-structure-simplification`](docs/roadmap.md#project-structure-simplification). v1 specs + reproduction steps: `tests/v1_spec.bats`. v0 shipped clusters and regression guard: [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md). Fork-safety architecture: [`docs/DESIGN_NOTES.md#fork-safety-architecture`](docs/DESIGN_NOTES.md#fork-safety-architecture).
+Full item lists: [`docs/roadmap.md`](docs/roadmap.md). Project-structure simplification plan (root keeps `README.md` only; all other markdown moves to `docs/`): [`docs/roadmap.md#project-structure-simplification`](docs/roadmap.md#project-structure-simplification). v1 specs + reproduction steps: `tests/v1_spec.bats`. v0 shipped clusters and regression guard: [`docs/design-notes.md`](docs/design-notes.md). Fork-safety architecture: [`docs/design-notes.md#fork-safety-architecture`](docs/design-notes.md#fork-safety-architecture).
 
 ---
 
@@ -277,8 +277,8 @@ Port slow Bash/Python utilities to Rust once patterns stabilize. **Mirror when:*
 
 - [`docs/ai-instructions.md`](docs/ai-instructions.md) — AI assistant rules
 - [`docs/skills/README.md`](docs/skills/README.md) — AI skills library
-- [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md) — N/B code index, fork-safety design, v0 shipped detail
-- [`docs/PVS.md`](docs/PVS.md) — Portable Vault Specification
+- [`docs/design-notes.md`](docs/design-notes.md) — N/B code index, fork-safety design, v0 shipped detail
+- [`docs/pvs.md`](docs/pvs.md) — Portable Vault Specification
 - [`scripts/README.md`](scripts/README.md) — cron job docs and crontab entries
 - [`scripts/setup-km.sh`](scripts/setup-km.sh) — canonical source for versions and defaults
 - [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — contributing features and fork workflow
