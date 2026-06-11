@@ -57,7 +57,7 @@ Usage:
   okm tagged <tag>
   okm rename-tag <old> <new>
   okm audit [--code-only|--vault-only] [--paths PATH...] [--quiet] [--json]
-  okm private <new|today|capture> [args...]
+  okm private <new|today|capture|yt|spot|pod> [args...]
   okm crypt init
   okm port <github-handle> [--no-push]
   okm obs
@@ -1055,9 +1055,15 @@ private_cmd() {
       DAILY_DIR="private/daily" NOTES_DIR="private/inbox" today_note "$@" ;;
     capture)
       NOTES_DIR="private/inbox" capture_note "$@" ;;
+    yt)
+      NOTES_DIR="private/inbox" yt_note "$@" ;;
+    spot)
+      NOTES_DIR="private/inbox" spot_note "$@" ;;
+    pod)
+      NOTES_DIR="private/inbox" pod_note "$@" ;;
     *)
       echo "okm private: unknown subcommand '$sub'" >&2
-      echo "Usage: okm private <new|today|capture> [args...]" >&2
+      echo "Usage: okm private <new|today|capture|yt|spot|pod> [args...]" >&2
       exit 1 ;;
   esac
 }

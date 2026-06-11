@@ -170,32 +170,57 @@ _youtube_id() {
 
 # Pull title/uploader/upload_date via yt-dlp when present. Sets the _YT_* vars.
 # Graceful no-op offline or without yt-dlp — same pattern as _spotify_fetch_metadata.
+# Uses --dump-json + Python to parse reliably; --print '\t' is literal in yt-dlp 2024.x.
 _YT_TITLE="" _YT_AUTHOR="" _YT_DATE=""
 _yt_fetch_metadata() {
   _YT_TITLE=""; _YT_AUTHOR=""; _YT_DATE=""
   command -v yt-dlp >/dev/null 2>&1 || return 0
-  local meta
-  meta="$(yt-dlp --no-warnings --skip-download \
-            --print '%(title)s\t%(uploader)s\t%(upload_date)s' "$1" 2>/dev/null | head -1 || true)"
-  [ -n "$meta" ] || return 0
-  _YT_TITLE="$(printf '%s' "$meta" | cut -f1)"
-  _YT_AUTHOR="$(printf '%s' "$meta" | cut -f2)"
-  _YT_DATE="$(printf '%s' "$meta" | cut -f3)"
+  local raw
+  raw="$(yt-dlp --no-warnings --skip-download --dump-json "$1" 2>/dev/null | head -1 || true)"
+  [ -n "$raw" ] || return 0
+  local parsed
+  parsed="$(printf '%s' "$raw" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+print(d.get("title", ""), d.get("uploader", ""), d.get("upload_date", ""), sep="\n")
+' 2>/dev/null || true)"
+  [ -n "$parsed" ] || return 0
+  _YT_TITLE="$(printf '%s' "$parsed" | sed -n '1p')"
+  _YT_AUTHOR="$(printf '%s' "$parsed" | sed -n '2p')"
+  _YT_DATE="$(printf '%s'  "$parsed" | sed -n '3p')"
 }
 
-# Print a plain-text transcript (auto-captions) via yt-dlp, or nothing.
+# Print a timestamped transcript via youtube_transcript_api, or nothing.
+# Output format: [MM:SS] text  (or [HH:MM:SS] for videos over an hour)
+# Tries English first, then any available language.
 _yt_fetch_transcript() {
-  command -v yt-dlp >/dev/null 2>&1 || return 0
-  local url="$1" tmp vtt
-  tmp="$(mktemp -d)" || return 0
-  yt-dlp --no-warnings --skip-download --write-auto-subs --write-subs \
-         --sub-langs 'en.*' --sub-format vtt -o "$tmp/sub" "$url" >/dev/null 2>&1 || true
-  vtt="$(find "$tmp" -name '*.vtt' 2>/dev/null | head -1)"
-  if [ -n "$vtt" ]; then
-    sed -E '/-->/d; /^WEBVTT/d; /^NOTE/d; /^[0-9]+$/d; s/<[^>]*>//g' "$vtt" \
-      | sed '/^[[:space:]]*$/d' | awk '!seen[$0]++'
-  fi
-  rm -rf "$tmp"
+  local vid="$1"
+  python3 - "$vid" 2>/dev/null <<'PYEOF'
+import sys
+from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
+
+vid = sys.argv[1]
+try:
+    ytt = YouTubeTranscriptApi()
+    # Try English first; fall back to the first available language.
+    try:
+        transcript_list = ytt.list(vid)
+        try:
+            t = transcript_list.find_transcript(['en', 'en-US', 'en-GB'])
+        except NoTranscriptFound:
+            t = next(iter(transcript_list))
+        segs = list(t.fetch())
+    except Exception:
+        segs = list(ytt.fetch(vid))
+    for s in segs:
+        start = int(s.start)
+        mm, ss = divmod(start, 60)
+        hh, mm = divmod(mm, 60)
+        stamp = f"{hh:02d}:{mm:02d}:{ss:02d}" if hh else f"{mm:02d}:{ss:02d}"
+        print(f"[{stamp}] {s.text}")
+except Exception:
+    sys.exit(1)
+PYEOF
 }
 
 yt_note() {
@@ -211,30 +236,30 @@ yt_note() {
 
   local vid; vid="$(_youtube_id "$url")" || exit 1
 
-  # You handed it a URL, so offer to pull the info down — but only when we can
-  # (yt-dlp present) and won't hang a script (interactive stdin). Declining or a
-  # missing tool leaves a clean offline scaffold.
+  # Fetch metadata via yt-dlp (graceful no-op if absent/offline).
+  if command -v yt-dlp >/dev/null 2>&1; then
+    _yt_fetch_metadata "$url"
+  fi
+  # Fetch transcript via youtube_transcript_api (independent of yt-dlp).
   local transcript=""
-  if command -v yt-dlp >/dev/null 2>&1 && [ -t 0 ]; then
-    printf 'Fetch title + transcript from YouTube now? [y/N] ' >&2
-    local reply; read -r reply
-    case "$reply" in
-      [Yy]*)
-        _yt_fetch_metadata "$url"
-        transcript="$(_yt_fetch_transcript "$url")"
-        ;;
-    esac
+  if python3 -c "import youtube_transcript_api" 2>/dev/null; then
+    transcript="$(_yt_fetch_transcript "$vid")" || true
   fi
 
   local title="${_YT_TITLE}"
   [ -n "$title" ] || title="YouTube ${vid}"
 
-  local pub_date=""
-  [ -n "$_YT_DATE" ] && pub_date="${_YT_DATE:0:4}-${_YT_DATE:4:2}-${_YT_DATE:6:2}"
+  local pub_date="" note_date
+  if [ -n "$_YT_DATE" ] && [[ "$_YT_DATE" =~ ^[0-9]{8}$ ]]; then
+    pub_date="${_YT_DATE:0:4}-${_YT_DATE:4:2}-${_YT_DATE:6:2}"
+    note_date="$pub_date"
+  else
+    note_date="$(date +%F)"
+  fi
 
   local slug; slug="$(slugify "$title")" || exit 1
   local file rel
-  file="$VAULT/$NOTES_DIR/$(date +%F)-${slug}.md"
+  file="$VAULT/$NOTES_DIR/${note_date}-${slug}.md"
   rel="${file#"$VAULT"/}"
 
   if [ ! -f "$file" ]; then
@@ -279,7 +304,7 @@ EOF
     if [ -n "$transcript" ]; then
       printf '%s\n' "$transcript" >> "$file"
     else
-      printf '%s\n' "<!-- okm yt fills this when yt-dlp is installed and you opt in; otherwise paste it here -->" >> "$file"
+      printf '%s\n' "<!-- okm yt fills this automatically when youtube_transcript_api is installed (pip install youtube-transcript-api) -->" >> "$file"
     fi
     echo "Created: $rel"
   else

@@ -118,3 +118,115 @@ setup() {
     [ -d "${KM_ROOT}" ]
     [ -f "${KM_ROOT}/env.sh" ]
 }
+
+# === Shell helpers (vf / vr / vg) ===
+
+@test "vf is defined after sourcing env.sh" {
+    source "${PROJECT_ROOT}/env.sh"
+    declare -f vf > /dev/null
+}
+
+@test "vr is defined after sourcing env.sh" {
+    source "${PROJECT_ROOT}/env.sh"
+    declare -f vr > /dev/null
+}
+
+@test "vg is defined after sourcing env.sh" {
+    source "${PROJECT_ROOT}/env.sh"
+    declare -f vg > /dev/null
+}
+
+_make_stubs() {
+    local bin="$1" rg_out="$2"
+    mkdir -p "$bin"
+    printf '#!/bin/bash\nprintf "%s\n" "%s"\n' "$rg_out" > "${bin}/rg"
+    printf '#!/bin/bash\nhead -1\n'                      > "${bin}/fzf"
+    printf '#!/bin/bash\nprintf "vim %%s\n" "$*"\n'      > "${bin}/vim"
+    chmod +x "${bin}/rg" "${bin}/fzf" "${bin}/vim"
+}
+
+@test "vr opens vim at correct file and line" {
+    local bin="${TEST_TEMP_DIR}/stubbin"
+    _make_stubs "$bin" "notes/foo.md:42:matched text"
+    local full_path="${bin}:${PATH}"
+    run bash -c "
+        export PATH='${full_path}'
+        source '${PROJECT_ROOT}/env.sh'
+        vr pattern
+    "
+    assert_success
+    assert_output "vim +42 notes/foo.md"
+}
+
+@test "vg delegates to vr — opens vim at correct file and line" {
+    local bin="${TEST_TEMP_DIR}/stubbin"
+    _make_stubs "$bin" "notes/bar.md:7:hello world"
+    local full_path="${bin}:${PATH}"
+    run bash -c "
+        export PATH='${full_path}'
+        source '${PROJECT_ROOT}/env.sh'
+        vg pattern
+    "
+    assert_success
+    assert_output "vim +7 notes/bar.md"
+}
+
+@test "vr returns 0 when fzf finds no match" {
+    local bin="${TEST_TEMP_DIR}/stubbin"
+    mkdir -p "$bin"
+    printf '#!/bin/bash\nprintf "notes/x.md:1:text\n"\n' > "${bin}/rg"
+    printf '#!/bin/bash\nreturn 1\n'                      > "${bin}/fzf"
+    chmod +x "${bin}/rg" "${bin}/fzf"
+    local full_path="${bin}:${PATH}"
+    run bash -c "
+        export PATH='${full_path}'
+        source '${PROJECT_ROOT}/env.sh'
+        vr pattern
+    "
+    assert_success
+}
+
+@test "vg returns 0 when fzf finds no match" {
+    local bin="${TEST_TEMP_DIR}/stubbin"
+    mkdir -p "$bin"
+    printf '#!/bin/bash\nprintf "notes/x.md:1:text\n"\n' > "${bin}/rg"
+    printf '#!/bin/bash\nreturn 1\n'                      > "${bin}/fzf"
+    chmod +x "${bin}/rg" "${bin}/fzf"
+    local full_path="${bin}:${PATH}"
+    run bash -c "
+        export PATH='${full_path}'
+        source '${PROJECT_ROOT}/env.sh'
+        vg pattern
+    "
+    assert_success
+}
+
+@test "vf opens vim with fzf-selected file" {
+    local bin="${TEST_TEMP_DIR}/stubbin"
+    mkdir -p "$bin"
+    printf '#!/bin/bash\nprintf "notes/my-note.md\n"\n' > "${bin}/fzf"
+    printf '#!/bin/bash\nprintf "vim %%s\n" "$*"\n'     > "${bin}/vim"
+    chmod +x "${bin}/fzf" "${bin}/vim"
+    local full_path="${bin}:${PATH}"
+    run bash -c "
+        export PATH='${full_path}'
+        source '${PROJECT_ROOT}/env.sh'
+        vf
+    "
+    assert_success
+    assert_output "vim notes/my-note.md"
+}
+
+@test "vf returns 0 when fzf finds no file" {
+    local bin="${TEST_TEMP_DIR}/stubbin"
+    mkdir -p "$bin"
+    printf '#!/bin/bash\nreturn 1\n' > "${bin}/fzf"
+    chmod +x "${bin}/fzf"
+    local full_path="${bin}:${PATH}"
+    run bash -c "
+        export PATH='${full_path}'
+        source '${PROJECT_ROOT}/env.sh'
+        vf
+    "
+    assert_success
+}
