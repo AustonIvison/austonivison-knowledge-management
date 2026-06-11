@@ -263,8 +263,8 @@ git add .gitattributes && git commit -m "configure git-crypt"
 |---|---|---|
 | **v0** | ✅ shipped | Core vault CLI, privacy boundary, hardened input |
 | **v1** | ✅ shipped (tagged `v1.0.0`) | Fork-safety, edge-case bugs, tagging gaps |
-| **v2** | 🟡 in progress | Media ingest (`okm pod`, `okm distill` shipped), encryption, performance |
-| **v3** | 🔵 planned | macOS support, Portable Vault Specification (PVS) |
+| **v2** | 🟡 in progress | Media ingest (`okm pod`, `okm distill` shipped), trust infrastructure |
+| **v3** | 🔵 planned | Rust mirrors of v2 features, encryption key workflow, push-safety (destination-aware notes, server-side vault guard), macOS support, Portable Vault Specification (PVS) |
 
 Full item lists: [`docs/roadmap.md`](docs/roadmap.md). Project-structure simplification (root keeps `README.md` only; all other markdown lives in `docs/`) — rationale and rejected alternatives: [`docs/roadmap.md#project-structure-simplification`](docs/roadmap.md#project-structure-simplification). v1 specs + reproduction steps: `tests/v1_spec.bats`. v0 shipped clusters and regression guard: [`docs/design-notes.md`](docs/design-notes.md). Fork-safety architecture: [`docs/design-notes.md#fork-safety-architecture`](docs/design-notes.md#fork-safety-architecture).
 
@@ -272,7 +272,7 @@ Full item lists: [`docs/roadmap.md`](docs/roadmap.md). Project-structure simplif
 
 ## Performance policy
 
-Port slow Bash/Python utilities to Rust once patterns stabilize. **Mirror when:** >1s on typical vault, hot-loop, or iteration-bound. **Don't mirror:** one-off scripts, I/O-bound, or anything still under active design. v2 "Rust mirror" row tracks this; v0/v1 stay in Bash/Python.
+Port slow Bash/Python utilities to Rust once patterns stabilize. **Mirror when:** >1s on typical vault, hot-loop, or iteration-bound. **Don't mirror:** one-off scripts, I/O-bound, or anything still under active design. The v3 "Rust mirrors of v2 features" item in [`docs/roadmap.md`](docs/roadmap.md) tracks this; v0–v2 stay in Bash/Python.
 
 ---
 
