@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Install and configure all tools for the knowledge management vault.
+# shellcheck disable=SC2088  # tildes appear only in user-facing messages, never expanded as paths
 
 set -euo pipefail
 

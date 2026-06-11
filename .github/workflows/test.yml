@@ -15,7 +15,10 @@ jobs:
           submodules: recursive
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep shellcheck
+
+      - name: Lint shell scripts
+        run: shellcheck -x --severity=warning bin/okm scripts/*.sh scripts/lib/*.sh scripts/hooks/pre-push
 
       - name: Run BATS test suite
         run: bash tests/run_all.sh --tap

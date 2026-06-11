@@ -6,6 +6,7 @@
 #
 # Exits 0 if all required checks pass; exits 1 if any FAIL.
 # WARN items are advisory and do not affect the exit code.
+# shellcheck disable=SC2088  # tildes appear only in user-facing messages, never expanded as paths
 
 set -uo pipefail
 

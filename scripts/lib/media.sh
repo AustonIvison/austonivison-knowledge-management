@@ -300,7 +300,7 @@ pod_note() {
   [ -n "$title" ] || title="$(basename "${audio_file%.*}")"
 
   local slug; slug="$(slugify "$title")" || exit 1
-  local file="$VAULT/$NOTES_DIR/$(date +%F)-${slug}.md"
+  local file; file="$VAULT/$NOTES_DIR/$(date +%F)-${slug}.md"
   local rel="${file#"$VAULT"/}"
 
   local safe_title; safe_title="$(yaml_escape_dq "$title")"
