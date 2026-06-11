@@ -26,7 +26,7 @@ Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI
 
 ## Setup
 
-**Prerequisites:** `git`, `curl`, `flatpak`, `sudo` access, GitHub account. Debian/Ubuntu only.
+**Prerequisites:** `bash` ≥ 4.0, `git`, `curl`, `flatpak`, `sudo` access, GitHub account. Debian/Ubuntu only.
 
 > **Fork first.** On GitHub: fork this repo, then go to your fork's **Settings → General → Repository name** and rename it to `{your-github-handle}-knowledge-management`. Clone *your fork*, not this repo, so `okm sync` pushes to your private copy.
 
@@ -43,6 +43,8 @@ bash tests/run_all.sh
 Setup prompt: **Track notes in git?** (default: yes). Pre-set with `KM_TRACK_NOTES=true|false`. Logs at `~/.local/log/setup-km-*.log`.
 
 **Manual steps:** SSH key (`ssh-keygen -t ed25519 -C km-vault`); git remote (`git -C "$(okm path)" remote add origin <url>`); optional git-crypt (see [git-crypt](#advanced-git-crypt)).
+
+**Cloned this repo instead of a fork?** Run `okm port {your-github-handle}` (after setup, clean working tree required). It converts the clone to the fork topology: renames `origin` → `upstream` with pushing disabled, adds a private `origin` at `{handle}-knowledge-management` (created via `gh` when available) and pushes `main` there (`--no-push` to skip), and activates the pre-push privacy guard (`scripts/hooks/pre-push` via `core.hooksPath`).
 
 ### Quickstart — verify editors
 
@@ -143,6 +145,8 @@ Vault follows [PARA](https://fortelabs.com/blog/para/). All agent/loom output be
 | `okm tag / untag` | Add/remove tags from frontmatter |
 | `okm tagged <tag>` | List notes with a given tag |
 | `okm audit` | Scan for PARA content, secrets, sensitive filenames |
+| `okm port <handle>` | Convert a direct clone to the fork topology; activates the pre-push privacy guard |
+| `okm crypt init` | Opt-in git-crypt encryption for tracked notes (see [git-crypt](#advanced-git-crypt)) |
 | `okm obs` | Launch Obsidian GUI |
 | `okm path` | Print vault path |
 
@@ -274,6 +278,8 @@ Port slow Bash/Python utilities to Rust once patterns stabilize. **Mirror when:*
 
 ## See Also
 
+- [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — release notes per version
+- [`docs/SECURITY.md`](docs/SECURITY.md) — privacy model and vulnerability reporting
 - [`docs/skills/README.md`](docs/skills/README.md) — AI skills library
 - [`docs/design-notes.md`](docs/design-notes.md) — N/B code index, fork-safety design, v0 shipped detail
 - [`docs/pvs.md`](docs/pvs.md) — Portable Vault Specification
