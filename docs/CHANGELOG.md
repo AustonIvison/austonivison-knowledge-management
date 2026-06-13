@@ -10,8 +10,13 @@ Notable changes to the knowledge-management tool. Format loosely follows
 - `okm distill <note>` — AI bullet summary written alongside a note (`--model claude|ollama`).
 - shellcheck lint gate in CI (`--severity=warning` across `bin/okm`, `scripts/`, `scripts/lib/`, and the pre-push hook).
 - `docs/CHANGELOG.md` and `docs/SECURITY.md`.
+- `tools/` — home (with charter README) for MCP servers and other vault tools/integrations.
+- `setup-km.sh` first-run prompt for your editor (vim/nvim); the choice is saved to gitignored `.km-editor` and honored by `env.sh`.
 
 ### Changed
+- `okm today` now opens **this week's** note — `YYYY-MM-DD-weekly.md` (Monday start, Mon–Sun) — instead of a per-day file.
+- Default `EDITOR` is now `vim` (was `nvim`). The editor chosen at setup is saved to `.km-editor` and is authoritative in the project env — it overrides an `EDITOR` inherited from your shell rc (so a global `export EDITOR=nvim` won't beat your vim choice). Per-command override still works: `EDITOR=emacs okm today`.
+- Neovim is now **opt-in**: `setup-km.sh` only downloads the nvim binary, links its config, and bootstraps plugins when `nvim` is chosen. `verify-km.sh` skips the nvim checks for vim users. vim is the lightweight default.
 - Media ingest (`spot`, `yt`, `pod`, `distill`) extracted from `bin/okm` into `scripts/lib/media.sh`.
 - Pre-push privacy guard now has a single tracked home — `scripts/hooks/pre-push`, activated via `core.hooksPath` by `okm port` — replacing the previous generated hook.
 - Project structure simplified: root keeps `README.md` only; all other markdown lives under `docs/` (`CONTRIBUTING.md`, `ORCHESTRATOR.md`, `design-notes.md`, `pvs.md`).

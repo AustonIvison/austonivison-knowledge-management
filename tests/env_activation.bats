@@ -36,15 +36,29 @@ setup() {
     [ "$OBSIDIAN_NOTES_DIR" = "public/inbox" ]
 }
 
-@test "EDITOR defaults to nvim when unset" {
+@test "EDITOR defaults to vim when unset and no saved choice" {
     unset EDITOR
-    source "${PROJECT_ROOT}/env.sh"
+    KM_EDITOR_FILE="${TEST_TEMP_DIR}/no-such-file" source "${PROJECT_ROOT}/env.sh"
+    [ "$EDITOR" = "vim" ]
+}
+
+@test "EDITOR uses the saved choice (.km-editor) when unset" {
+    unset EDITOR
+    printf 'nvim\n' > "${TEST_TEMP_DIR}/.km-editor"
+    KM_EDITOR_FILE="${TEST_TEMP_DIR}/.km-editor" source "${PROJECT_ROOT}/env.sh"
     [ "$EDITOR" = "nvim" ]
 }
 
-@test "EDITOR is preserved if already set (e.g. EDITOR=vim)" {
-    EDITOR=vim source "${PROJECT_ROOT}/env.sh"
+@test "saved .km-editor choice overrides an inherited EDITOR" {
+    # A global EDITOR=nvim (e.g. from ~/.bashrc) must NOT beat the vim chosen at setup.
+    printf 'vim\n' > "${TEST_TEMP_DIR}/.km-editor"
+    EDITOR=nvim KM_EDITOR_FILE="${TEST_TEMP_DIR}/.km-editor" source "${PROJECT_ROOT}/env.sh"
     [ "$EDITOR" = "vim" ]
+}
+
+@test "inherited EDITOR is used when there is no saved choice" {
+    EDITOR=emacs KM_EDITOR_FILE="${TEST_TEMP_DIR}/no-such-file" source "${PROJECT_ROOT}/env.sh"
+    [ "$EDITOR" = "emacs" ]
 }
 
 @test "NVIM_APPNAME is set to km" {

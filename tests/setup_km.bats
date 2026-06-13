@@ -159,6 +159,20 @@ setup() {
     [ ! -L "${HOME}/.config/km" ]
 }
 
+# === editor choice (vim default, nvim opt-in) ===
+
+@test "setup-km.sh prompts for editor and persists choice to .km-editor" {
+    grep -q 'KM_EDITOR' "${PROJECT_ROOT}/scripts/setup-km.sh"
+    grep -q '\.km-editor' "${PROJECT_ROOT}/scripts/setup-km.sh"
+    # the prompt defaults to vim
+    grep -Eq 'Editor\?.*default: vim' "${PROJECT_ROOT}/scripts/setup-km.sh"
+}
+
+@test "setup-km.sh gates Neovim install on KM_EDITOR=nvim" {
+    # install_nvim and bootstrap_nvim_plugins must sit behind an nvim-editor gate
+    grep -q '"${KM_EDITOR:-vim}" = "nvim"' "${PROJECT_ROOT}/scripts/setup-km.sh"
+}
+
 # === install_nvim ===
 
 @test "install_nvim creates wrapper script at bin/nvim" {

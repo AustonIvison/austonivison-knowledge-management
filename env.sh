@@ -38,10 +38,27 @@ if ! locale -a 2>/dev/null | grep -qi 'en_US\.utf'; then
     export LANG=C.UTF-8
 fi
 
-# --- Editor: use project-scoped nvim config via NVIM_APPNAME ---
-# ~/.config/km is kept in sync with the project's config/nvim so that
-# NVIM_APPNAME=km always resolves correctly, regardless of repo location or username.
-export EDITOR="${EDITOR:-nvim}"
+# --- Editor: vim by default; the saved project choice is authoritative ---
+# Precedence within the project env:
+#   the choice saved by setup (.km-editor)  >  an inherited EDITOR  >  vim.
+# The saved choice intentionally OVERRIDES an EDITOR inherited from your shell
+# rc, so a global `export EDITOR=nvim` in ~/.bashrc/~/.zshrc won't beat the
+# vim you picked at setup. Change it by editing/deleting .km-editor or re-running
+# setup. Per-command override still works: `EDITOR=emacs okm today`.
+# (KM_EDITOR_FILE overrides the path — used by the test suite for isolation.)
+_km_editor_file="${KM_EDITOR_FILE:-${KM_ROOT}/.km-editor}"
+_km_saved_editor=""
+if [ -r "${_km_editor_file}" ]; then
+    _km_saved_editor="$(tr -d '[:space:]' < "${_km_editor_file}" 2>/dev/null || true)"
+fi
+if [ -n "${_km_saved_editor}" ]; then
+    export EDITOR="${_km_saved_editor}"
+else
+    export EDITOR="${EDITOR:-vim}"
+fi
+unset _km_editor_file _km_saved_editor
+# NVIM_APPNAME=km keeps the project nvim config isolated for anyone who does
+# choose nvim; ~/.config/km is kept in sync with config/nvim below.
 export NVIM_APPNAME=km
 if [ -d "${KM_ROOT}/config/nvim" ]; then
     _km_link="${HOME}/.config/km"

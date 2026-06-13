@@ -94,13 +94,14 @@ setup() {
 
 # === okm today ===
 
-@test "okm today creates daily note with correct date" {
+@test "okm today creates weekly note for the current week" {
     run "${OKM}" today
-    local today
-    today="$(date +%F)"
-    local file="${FAKE_VAULT_DIR}/public/daily/${today}.md"
+    local dow week_start
+    dow="$(date +%u)"
+    week_start="$(date -d "-$((dow - 1)) days" +%F)"
+    local file="${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md"
     [ -f "$file" ]
-    grep -q "date: ${today}" "$file"
+    grep -q "week_start: ${week_start}" "$file"
     grep -q "## Captures" "$file"
     grep -q "## Notes" "$file"
     grep -q "## Tasks" "$file"
@@ -109,9 +110,10 @@ setup() {
 }
 
 @test "okm today is idempotent (does not overwrite)" {
-    local today
-    today="$(date +%F)"
-    local file="${FAKE_VAULT_DIR}/public/daily/${today}.md"
+    local dow week_start
+    dow="$(date +%u)"
+    week_start="$(date -d "-$((dow - 1)) days" +%F)"
+    local file="${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md"
     # Create it first
     run "${OKM}" today
     [ -f "$file" ]

@@ -13,7 +13,8 @@ Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI
 | Tool | Role | Installed by |
 |---|---|---|
 | Obsidian | GUI vault viewer, graph view | Flatpak (network revoked) |
-| Neovim + obsidian.nvim | Terminal editor + vault integration | `bin/nvim` + lazy.nvim |
+| Vim | Default terminal editor | apt; project vimrc via `bin/vim` |
+| Neovim + obsidian.nvim | Optional editor + vault integration | **opt-in at setup** → `bin/nvim` + lazy.nvim |
 | lazygit | TUI git client | `bin/lazygit` via GitHub release |
 | okm | Vault CLI | `bin/okm` (tracked in git) |
 | yt-dlp / whisperX / spotdl | Media transcription | Python venv |
@@ -40,7 +41,7 @@ bash tests/run_all.sh
 
 > **Note:** Run `bash scripts/setup-km.sh` before `direnv allow .` — setup installs `direnv` itself.
 
-Setup prompt: **Track notes in git?** (default: yes). Pre-set with `KM_TRACK_NOTES=true|false`. Logs at `~/.local/log/setup-km-*.log`.
+Setup prompts: **Track notes in git?** (default: yes; pre-set with `KM_TRACK_NOTES=true|false`) and **Editor?** (default: vim; choose `nvim` to also download Neovim + plugins; pre-set with `KM_EDITOR=vim|nvim`). The choice is saved to `.km-editor` and honored by `env.sh`. Logs at `~/.local/log/setup-km-*.log`.
 
 **Manual steps:** SSH key (`ssh-keygen -t ed25519 -C km-vault`); git remote (`git -C "$(okm path)" remote add origin <url>`); optional git-crypt (see [git-crypt](#advanced-git-crypt)).
 
@@ -55,7 +56,7 @@ bash scripts/seed-demo.sh --teardown   # clean up
 ```
 
 **Obsidian:** `okm obs` → open `$(okm path)` as vault on first launch.
-**Neovim:** `nvim public/daily/demo-$(date +%Y-%m-%d).md` — expect green `PUBLIC PARA · daily` winbar, TODO/FIXME/BUG highlights, `<leader>od/on/os/oo/ob` keymaps. If missing: `NVIM_APPNAME=km nvim --headless "+Lazy! sync" +qa`.
+**Neovim** (only if you chose `nvim` at setup): `nvim public/daily/demo-$(date +%Y-%m-%d).md` — expect green `PUBLIC PARA · daily` winbar, TODO/FIXME/BUG highlights, `<leader>od/on/os/oo/ob` keymaps. If missing: `NVIM_APPNAME=km nvim --headless "+Lazy! sync" +qa`.
 **Vim:** `EDITOR=vim okm open public/inbox/demo-meeting-notes.md` — expect green `PUBLIC PARA · inbox` statusline. (`bin/vim` wraps `vim -u config/vim/vimrc`; `bin/` is first on `$PATH` via `env.sh` so `vim` loads project config without touching `~/.vimrc`.)
 **Private side test:** `nvim private/inbox/demo-private.md` → red `⚠ PRIVATE PARA` banner.
 
@@ -68,10 +69,10 @@ Seeded files: `public/daily/demo-YYYY-MM-DD.md` · `public/inbox/demo-{meeting-n
 | Editor | Launch | Notes |
 |---|---|---|
 | Obsidian | `okm obs` | First launch: open `$(okm path)` as vault |
-| Neovim | `okm today` | Project config via `NVIM_APPNAME=km` |
-| Vim | `EDITOR=vim okm today` | Project vimrc via `bin/vim`; sources `~/.vimrc` first |
+| Vim | `okm today` | Default editor; project vimrc via `bin/vim`; sources `~/.vimrc` first |
+| Neovim | `EDITOR=nvim okm today` | Project config via `NVIM_APPNAME=km` (or save the choice via setup) |
 
-- **Capture:** `okm today` (daily note) or `okm capture <text>` (timestamped)
+- **Capture:** `okm today` (this week's note) or `okm capture <text>` (timestamped)
 - **Save from a link:** `okm yt <youtube-url>` or `okm spot <spotify-url>` — writes a dated, searchable note (`public/inbox/YYYY-MM-DD-title.md`), prints its path, and opens it. With `yt-dlp`/`spotdl` installed, `okm yt` offers to pull the title + transcript; otherwise it's an offline scaffold you (or a loom agent) fill in.
 - **Search:** `okm grep <pattern>` (content) or `okm files [pattern]` (paths)
 - **Sync:** `okm sync [message]` — default commit message: `vault sync YYYY-MM-DD HH:MM:SS`
@@ -97,6 +98,7 @@ Seeded files: `public/daily/demo-YYYY-MM-DD.md` · `public/inbox/demo-{meeting-n
 ├── scripts/verify-km.sh            # post-install checks
 ├── scripts/{todo-summary,weekly-tasks}.sh   # cron scanners
 ├── scripts/compress-images.py      # PNG/JPG → WebP (cron)
+├── tools/                          # MCP servers + vault tools (charter in tools/README.md)
 ├── tests/                          # BATS suite
 └── venv/                           # Python venv (gitignored)
 
@@ -129,7 +131,7 @@ Vault follows [PARA](https://fortelabs.com/blog/para/). All agent/loom output be
 
 | Subcommand | What it does |
 |---|---|
-| `okm today` | Open/create today's daily note |
+| `okm today` | Open/create this week's note (`YYYY-MM-DD-weekly.md`, Mon–Sun) |
 | `okm new <title>` | Create slugified note in `public/inbox/` with frontmatter |
 | `okm capture [text]` | Timestamped quick-capture note |
 | `okm spot <url>` | Create note from Spotify link (episode, track, album, playlist) |
@@ -157,16 +159,16 @@ Vault follows [PARA](https://fortelabs.com/blog/para/). All agent/loom output be
 | Variable | Default | Purpose |
 |---|---|---|
 | `OBSIDIAN_VAULT` | `../knowledge-management` | Vault root |
-| `OBSIDIAN_DAILY_DIR` | `public/daily` | Where `okm today` writes |
+| `OBSIDIAN_DAILY_DIR` | `public/daily` | Where `okm today`'s weekly note is written |
 | `OBSIDIAN_NOTES_DIR` | `public/inbox` | Where `okm new`/`capture` write |
-| `EDITOR` | `nvim` | Editor for note commands |
+| `EDITOR` | `vim` | Editor for note commands; setup saves your choice (vim/nvim) to `.km-editor`, which overrides an `EDITOR` inherited from your shell rc |
 | `KM_TRACK_NOTES` | `true` | Track notes in git |
 
 ---
 
 ## Neovim
 
-Config via `NVIM_APPNAME=km` → `~/.config/km/`. Global `~/.config/nvim` unaffected.
+Opt-in (choose `nvim` at setup, or `KM_EDITOR=nvim bash scripts/setup-km.sh`). Config via `NVIM_APPNAME=km` → `~/.config/km/`. Global `~/.config/nvim` unaffected.
 
 | Keymap | What it does |
 |---|---|
@@ -194,7 +196,7 @@ Tools: yt-dlp, spotdl, whisperX (large-v3-turbo), ffmpeg, mpv (`s` key → scree
 
 | Template | Producer |
 |---|---|
-| `daily-template.md` | `okm today` |
+| `daily-template.md` | demo daily note (`seed-demo.sh`); `okm today` now writes a Mon–Sun `*-weekly.md` |
 | `note-template.md` | `okm new` |
 | `capture-template.md` | `okm capture` |
 | `yt-template.md` / `podcast-template.md` | `okm yt` / `okm pod` |
@@ -284,6 +286,7 @@ Port slow Bash/Python utilities to Rust once patterns stabilize. **Mirror when:*
 - [`docs/design-notes.md`](docs/design-notes.md) — N/B code index, fork-safety design, v0 shipped detail
 - [`docs/pvs.md`](docs/pvs.md) — Portable Vault Specification
 - [`scripts/README.md`](scripts/README.md) — cron job docs and crontab entries
+- [`tools/README.md`](tools/README.md) — MCP servers and vault tools (charter + candidates)
 - [`scripts/setup-km.sh`](scripts/setup-km.sh) — canonical source for versions and defaults
 - [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — contributing features and fork workflow
 - [`docs/DISCLAIMER.md`](docs/DISCLAIMER.md) — disclaimer and limitation of liability

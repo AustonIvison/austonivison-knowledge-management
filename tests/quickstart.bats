@@ -79,11 +79,12 @@ setup() {
 # === Step 2: source env.sh activates environment ===
 
 @test "quickstart: env.sh sets all required variables" {
-    source "${PROJECT_ROOT}/env.sh"
+    unset EDITOR
+    KM_EDITOR_FILE="${TEST_TEMP_DIR}/no-such-file" source "${PROJECT_ROOT}/env.sh"
     [ -n "$OBSIDIAN_VAULT" ]
     [ -n "$OBSIDIAN_DAILY_DIR" ]
     [ -n "$OBSIDIAN_NOTES_DIR" ]
-    [ "$EDITOR" = "nvim" ]
+    [ "$EDITOR" = "vim" ]
     [ "$NVIM_APPNAME" = "km" ]
     [ -n "$LG_CONFIG_FILE" ]
 }
@@ -105,15 +106,16 @@ setup() {
     assert_output "$expected"
 }
 
-@test "quickstart: okm today creates daily note in vault" {
+@test "quickstart: okm today creates weekly note in vault" {
     export EDITOR="true"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
     export OBSIDIAN_DAILY_DIR="public/daily"
     export OBSIDIAN_NOTES_DIR="public/inbox"
     run "${PROJECT_ROOT}/bin/okm" today
-    local today
-    today="$(date +%F)"
-    [ -f "${FAKE_VAULT_DIR}/public/daily/${today}.md" ]
+    local dow week_start
+    dow="$(date +%u)"
+    week_start="$(date -d "-$((dow - 1)) days" +%F)"
+    [ -f "${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md" ]
 }
 
 @test "quickstart: okm new creates note in vault inbox" {

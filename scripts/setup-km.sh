@@ -747,6 +747,29 @@ if [ -z "${KM_TRACK_NOTES:-}" ]; then
     log_info "KM_TRACK_NOTES=${KM_TRACK_NOTES} (user selected)"
 fi
 
+# Ask which editor okm should open notes in, unless KM_EDITOR is preset
+# (preset lets non-interactive/automated installs skip the prompt).
+if [ -z "${KM_EDITOR:-}" ]; then
+    echo ""
+    echo "Which editor should okm open your notes in?"
+    echo "  vim  — classic Vim, project vimrc via the bin/vim wrapper. Lightweight; nothing extra to install. (default)"
+    echo "  nvim — Neovim with the bundled LazyVim + obsidian.nvim config. Downloads the Neovim binary + plugins."
+    echo ""
+    printf "Editor? [vim/nvim] (default: vim) "
+    read -r editor_answer
+    case "${editor_answer}" in
+        [Nn]|[Nn][Vv][Ii][Mm]|[Nn][Ee][Oo]*) KM_EDITOR=nvim ;;
+        *)                                    KM_EDITOR=vim ;;
+    esac
+    log_info "KM_EDITOR=${KM_EDITOR} (user selected)"
+fi
+
+# Persist the choice so env.sh defaults EDITOR to it every session.
+# .km-editor is gitignored (per-user, not source). An EDITOR you export
+# yourself still wins; this only sets the default.
+printf '%s\n' "${KM_EDITOR}" > "${SCRIPT_DIR}/.km-editor"
+log_info "OK: saved editor choice to ${SCRIPT_DIR}/.km-editor (${KM_EDITOR})"
+
 # Privacy gate: if the user wants to track notes AND a remote is provided,
 # verify it is a private GitHub repo. A public remote is rejected — personal
 # notes must never be pushed to a public repository.
@@ -784,14 +807,24 @@ ensure_upstream_remote "${VAULT_DIR}"
 log_info "==> Installing vault privacy hook"
 install_vault_privacy_hook "${VAULT_DIR}"
 
-log_info "==> Installing Neovim"
-install_nvim
+# Neovim is opt-in: only install the (heavy) nvim binary + plugins when the
+# user chose nvim at the editor prompt. vim users get a lighter-weight setup.
+if [ "${KM_EDITOR:-vim}" = "nvim" ]; then
+    log_info "==> Installing Neovim"
+    install_nvim
+else
+    log_info "SKIP: Neovim install (editor=${KM_EDITOR:-vim}; re-run setup and choose nvim to add it)"
+fi
 
 log_info "==> Installing lazygit"
 install_lazygit
 
-log_info "==> Linking Neovim config"
-ensure_nvim_config_link
+if [ "${KM_EDITOR:-vim}" = "nvim" ]; then
+    log_info "==> Linking Neovim config"
+    ensure_nvim_config_link
+else
+    log_info "SKIP: Neovim config link (editor=${KM_EDITOR:-vim})"
+fi
 
 if [ "${KM_INSTALL_FONT:-1}" = "1" ]; then
     log_info "==> Installing Nerd Font (terminal icons)"
@@ -803,8 +836,12 @@ fi
 log_info "==> Verifying lazygit config"
 verify_lazygit_config
 
-log_info "==> Bootstrapping Neovim plugins"
-bootstrap_nvim_plugins
+if [ "${KM_EDITOR:-vim}" = "nvim" ]; then
+    log_info "==> Bootstrapping Neovim plugins"
+    bootstrap_nvim_plugins
+else
+    log_info "SKIP: Neovim plugin bootstrap (editor=${KM_EDITOR:-vim})"
+fi
 
 log_info "==> Setting up transcription tools"
 ensure_transcription_venv

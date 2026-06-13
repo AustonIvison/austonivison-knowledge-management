@@ -30,6 +30,9 @@ bin/lazygit
 # Stray NVIM_APPNAME self-symlink artifact (absolute path → leaks home dir if committed)
 config/nvim/nvim
 
+# Per-user editor choice saved by setup-km.sh's first-run prompt (vim/nvim)
+.km-editor
+
 # Vault notes (excluded when KM_TRACK_NOTES=false; templates always kept)
 public/inbox/*.md
 !public/inbox/templates/

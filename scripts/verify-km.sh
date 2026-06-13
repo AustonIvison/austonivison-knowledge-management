@@ -19,6 +19,18 @@ VAULT_DIR="$(km_vault_dir "${SCRIPT_DIR}")"
 BIN_DIR="${SCRIPT_DIR}/bin"
 LAZY_DIR="${HOME}/.local/share/km/lazy"
 
+# Editor choice (vim by default). Neovim is opt-in at setup, so verify the
+# Neovim stack only when nvim was selected (.km-editor) or is actually present.
+KM_EDITOR_CHOICE="vim"
+_km_editor_file="${KM_EDITOR_FILE:-${SCRIPT_DIR}/.km-editor}"
+if [ -r "${_km_editor_file}" ]; then
+    KM_EDITOR_CHOICE="$(tr -d '[:space:]' < "${_km_editor_file}" 2>/dev/null || echo vim)"
+fi
+CHECK_NVIM=false
+if [ "${KM_EDITOR_CHOICE}" = "nvim" ] || [ -x "${BIN_DIR}/nvim.bin" ]; then
+    CHECK_NVIM=true
+fi
+
 PASS_COUNT=0
 FAIL_COUNT=0
 WARN_COUNT=0
@@ -32,6 +44,7 @@ NC='\033[0m'
 _pass()    { printf "${GREEN}[PASS]${NC} %s\n" "$1"; PASS_COUNT=$((PASS_COUNT + 1)); }
 _fail()    { printf "${RED}[FAIL]${NC} %s\n" "$1"; FAIL_COUNT=$((FAIL_COUNT + 1)); }
 _warn()    { printf "${YELLOW}[WARN]${NC} %s\n" "$1"; WARN_COUNT=$((WARN_COUNT + 1)); }
+_skip()    { printf "${BOLD}[SKIP]${NC} %s\n" "$1"; }
 _section() { printf "\n${BOLD}── %s ${NC}\n" "$1"; }
 
 # ── System packages (apt) ────────────────────────────────────────────────────
@@ -87,17 +100,27 @@ fi
 # ── Project binaries ────────────────────────────────────────────────────────
 _section "Project binaries (${BIN_DIR})"
 
-for bin in nvim lazygit okm; do
+for bin in lazygit okm; do
     if [ -x "${BIN_DIR}/${bin}" ]; then
         _pass "${bin}  (${BIN_DIR}/${bin})"
     else
         _fail "${bin} not found at ${BIN_DIR}/${bin} — run: bash setup-km.sh"
     fi
 done
+if ${CHECK_NVIM}; then
+    if [ -x "${BIN_DIR}/nvim" ]; then
+        _pass "nvim  (${BIN_DIR}/nvim)"
+    else
+        _fail "nvim not found at ${BIN_DIR}/nvim — run: bash setup-km.sh"
+    fi
+fi
 
 # ── Neovim installation integrity ──────────────────────────────────────────
 _section "Neovim installation"
 
+if ! ${CHECK_NVIM}; then
+    _skip "editor=${KM_EDITOR_CHOICE} (vim default) — Neovim not installed; re-run setup and choose nvim to add it"
+else
 # Wrapper + binary + runtime must all be present
 if [ -x "${BIN_DIR}/nvim.bin" ]; then
     _pass "nvim.bin binary present"
@@ -135,6 +158,7 @@ if [ -x "${BIN_DIR}/nvim" ]; then
         _pass "nvim headless startup OK (runtime loads correctly)"
     fi
 fi
+fi  # CHECK_NVIM (Neovim installation)
 
 # ── Vault structure ──────────────────────────────────────────────────────────
 _section "Vault structure"
@@ -202,6 +226,9 @@ fi
 # ── Project-scoped config (NVIM_APPNAME=km) ─────────────────────────────────
 _section "Neovim config (NVIM_APPNAME=km)"
 
+if ! ${CHECK_NVIM}; then
+    _skip "editor=${KM_EDITOR_CHOICE} (vim default) — skipping Neovim config checks"
+else
 km_cfg="${HOME}/.config/km"
 project_nvim="${SCRIPT_DIR}/config/nvim"
 
@@ -246,6 +273,7 @@ if [ -d "${LAZY_DIR}/obsidian.nvim" ]; then
 else
     _warn "obsidian.nvim not yet downloaded — run: source env.sh && nvim (triggers bootstrap)"
 fi
+fi  # CHECK_NVIM (Neovim config)
 
 # ── Nerd Font (terminal icons) ──────────────────────────────────────────────
 _section "Nerd Font"
@@ -338,12 +366,14 @@ else
     _pass "~/.config/lazygit not overridden by project"
 fi
 
-# lazy.nvim: update checker disabled
-lazy_lua="${project_nvim}/lua/config/lazy.lua"
-if grep -q 'enabled = false' "${lazy_lua}" 2>/dev/null; then
-    _pass "lazy.nvim: update checker disabled (${lazy_lua})"
-else
-    _fail "lazy.nvim update checker not disabled — check ${lazy_lua}"
+# lazy.nvim: update checker disabled (nvim-only)
+if ${CHECK_NVIM}; then
+    lazy_lua="${SCRIPT_DIR}/config/nvim/lua/config/lazy.lua"
+    if grep -q 'enabled = false' "${lazy_lua}" 2>/dev/null; then
+        _pass "lazy.nvim: update checker disabled (${lazy_lua})"
+    else
+        _fail "lazy.nvim update checker not disabled — check ${lazy_lua}"
+    fi
 fi
 
 # ── Git remote ───────────────────────────────────────────────────────────────

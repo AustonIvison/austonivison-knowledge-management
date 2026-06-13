@@ -70,6 +70,23 @@ setup() {
     echo "$output" | grep -q '\[PASS\].*nvim headless startup OK'
 }
 
+@test "verify SKIPs Neovim checks (no FAIL) when editor=vim and nvim absent" {
+    [ -x "${PROJECT_ROOT}/bin/nvim.bin" ] && skip "nvim installed — checks run regardless of editor choice"
+    local ed; ed="$(mktemp)"; printf 'vim\n' > "$ed"
+    run env KM_EDITOR_FILE="$ed" bash "${PROJECT_ROOT}/scripts/verify-km.sh"
+    rm -f "$ed"
+    echo "$output" | grep -q '\[SKIP\].*Neovim not installed'
+    # A missing nvim must not be reported as a failure for vim users.
+    ! echo "$output" | grep -q '\[FAIL\].*nvim'
+}
+
+@test "verify runs Neovim checks (not skipped) when editor=nvim" {
+    local ed; ed="$(mktemp)"; printf 'nvim\n' > "$ed"
+    run env KM_EDITOR_FILE="$ed" bash "${PROJECT_ROOT}/scripts/verify-km.sh"
+    rm -f "$ed"
+    ! echo "$output" | grep -q '\[SKIP\].*Neovim not installed'
+}
+
 # === Nerd Font checks ===
 
 @test "verify checks for Nerd Font installation" {

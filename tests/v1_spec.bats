@@ -94,9 +94,10 @@ tags: [source/spotify]
     unset KM_TRACK_NOTES
     run "${OKM}" today
     assert_success
-    local today
-    today=$(date +%Y-%m-%d)
-    [ -f "${FAKE_VAULT_DIR}/public/daily/${today}.md" ]
+    local dow week_start
+    dow=$(date +%u)
+    week_start=$(date -d "-$((dow - 1)) days" +%F)
+    [ -f "${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md" ]
 }
 
 # =============================================================================
@@ -308,9 +309,10 @@ tags: [oldtag, other]
 @test "okm today -t sets tags in frontmatter" {
     run "${OKM}" today -t work,journal
     assert_success
-    local today
-    today=$(date +%Y-%m-%d)
-    run grep "tags:" "${FAKE_VAULT_DIR}/public/daily/${today}.md"
+    local dow week_start
+    dow=$(date +%u)
+    week_start=$(date -d "-$((dow - 1)) days" +%F)
+    run grep "tags:" "${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md"
     assert_output --partial "work"
     assert_output --partial "journal"
 }
@@ -361,13 +363,14 @@ tags: [foo]
     [ -f "${FAKE_VAULT_DIR}/private/inbox/${slug}.md" ]
 }
 
-@test "okm private today creates daily note in private/daily" {
+@test "okm private today creates weekly note in private/daily" {
     mkdir -p "${FAKE_VAULT_DIR}/private/daily"
     run "${OKM}" private today
     assert_success
-    local today
-    today=$(date +%Y-%m-%d)
-    [ -f "${FAKE_VAULT_DIR}/private/daily/${today}.md" ]
+    local dow week_start
+    dow=$(date +%u)
+    week_start=$(date -d "-$((dow - 1)) days" +%F)
+    [ -f "${FAKE_VAULT_DIR}/private/daily/${week_start}-weekly.md" ]
 }
 
 @test "okm private capture adds note to private/inbox" {

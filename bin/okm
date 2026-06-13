@@ -42,7 +42,7 @@ Usage:
   okm open [path]
   okm new <title> [-t tag1,tag2]
   okm capture [text] [-t tag1,tag2]
-  okm today [-t tag1,tag2]
+  okm today [-t tag1,tag2]              # opens this week's note (YYYY-MM-DD-weekly.md, Mon–Sun)
   okm spot <spotify-url> [-t tag1,tag2]
   okm yt <youtube-url> [-t tag1,tag2]
   okm pod <audio-file> [title] [-t tag1,tag2]
@@ -72,6 +72,8 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Missing: $1" >&2; exit 1
 source "${OKM_SCRIPT_DIR}/scripts/lib/privacy.sh"
 # shellcheck source=scripts/lib/media.sh
 source "${OKM_SCRIPT_DIR}/scripts/lib/media.sh"   # spot, yt, pod, distill
+# shellcheck source=scripts/lib/platform.sh
+source "${OKM_SCRIPT_DIR}/scripts/lib/platform.sh"   # _date_add (portable week math)
 
 # N20: collapse vertical whitespace before slugifying.
 # N14: fail-closed on empty/short slugs. N18: cap at 200 chars.
@@ -637,21 +639,27 @@ EOF
   exec "$EDITOR_CMD" "$file"
 }
 
+# Opens the current week's note (Mon–Sun), named <week-start>-weekly.md.
+# "today" is kept as the command name; it resolves to the week containing today.
 today_note() {
   ensure_dirs
   parse_tag_flag "$@"
-  local d file
-  d="$(date +%F)"
-  file="$VAULT/$DAILY_DIR/$d.md"
-  local tags_yaml; tags_yaml="$(_tags_yaml "daily")"
+  local today dow week_start week_end file
+  today="$(date +%F)"
+  dow="$(date +%u)"                               # 1=Mon … 7=Sun
+  week_start="$(_date_add "$today" "-$((dow - 1))")"
+  week_end="$(_date_add "$today" "+$((7 - dow))")"
+  file="$VAULT/$DAILY_DIR/${week_start}-weekly.md"
+  local tags_yaml; tags_yaml="$(_tags_yaml "weekly")"
   [ -f "$file" ] || cat > "$file" <<EOF
 ---
-date: $d
+week_start: $week_start
+week_end: $week_end
 created: $(iso_now)
 tags: ${tags_yaml}
 ---
 
-# $d
+# Week of $week_start – $week_end
 
 ## Captures
 
