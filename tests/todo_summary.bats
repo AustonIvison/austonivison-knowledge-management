@@ -11,9 +11,9 @@ setup() {
     mkdir -p "${TEST_TEMP_DIR}/scripts/lib"
     cp "${PROJECT_ROOT}/scripts/lib/"*.sh "${TEST_TEMP_DIR}/scripts/lib/"
     cp "${PROJECT_ROOT}/scripts/todo-summary.sh" "${TEST_TEMP_DIR}/todo-summary.sh"
-    sed -i "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"${TEST_TEMP_DIR}\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
-    sed -i "s|^PROJECT_DIR=.*|PROJECT_DIR=\"${FAKE_PROJECT_DIR}\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
-    sed -i "s|^OUTPUT_FILE=.*|OUTPUT_FILE=\"${FAKE_PROJECT_DIR}/public/inbox/todo-summary-\${YEAR}.md\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
+    sed_in_place "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"${TEST_TEMP_DIR}\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
+    sed_in_place "s|^PROJECT_DIR=.*|PROJECT_DIR=\"${FAKE_PROJECT_DIR}\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
+    sed_in_place "s|^OUTPUT_FILE=.*|OUTPUT_FILE=\"${FAKE_PROJECT_DIR}/public/inbox/todo-summary-\${YEAR}.md\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
     chmod +x "${TEST_TEMP_DIR}/todo-summary.sh"
 }
@@ -380,7 +380,7 @@ Move completed items here during your review.
 FILEEOF
 
     # Patch TODAY to be 2026-04-10 so it's a new day
-    sed -i "s|^TODAY=.*|TODAY=\"2026-04-10\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
+    sed_in_place "s|^TODAY=.*|TODAY=\"2026-04-10\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
 
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
 
@@ -439,7 +439,7 @@ _No review items._
 Move completed items here during your review.
 FILEEOF
 
-    sed -i "s|^TODAY=.*|TODAY=\"2026-04-10\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
+    sed_in_place "s|^TODAY=.*|TODAY=\"2026-04-10\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
 
     # The checked item should still be in the 2026-04-09 section
@@ -454,7 +454,8 @@ FILEEOF
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
     local file="${FAKE_PROJECT_DIR}/public/inbox/todo-summary-$(date +%Y).md"
 
-    sed -i '/^## Archive/a\- [x] Finished the deploy — went smoothly' "$file"
+    sed_in_place '/^## Archive/a\
+- [x] Finished the deploy — went smoothly' "$file"
     grep -q "Finished the deploy" "$file"
 
     bash "${TEST_TEMP_DIR}/todo-summary.sh" --output
@@ -533,7 +534,7 @@ tags: [daily]
     assert_success
     local section
     section=$(echo "$output" | sed -n '/^#### Areas/,/^#### Resources/p')
-    echo "$section" | grep -q '**2026-04-10**'
+    echo "$section" | grep -qF '**2026-04-10**'
     echo "$section" | grep -q 'daily/2026-04-10.md:'
     echo "$section" | grep -q 'review pull requests'
 }
@@ -578,7 +579,7 @@ TODO: this is a real todo item"
 # === Edge cases ===
 
 @test "missing vault dir does not cause error" {
-    sed -i "s|^VAULT_DIR=.*|VAULT_DIR=\"/nonexistent/path/that/does/not/exist\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
+    sed_in_place "s|^VAULT_DIR=.*|VAULT_DIR=\"/nonexistent/path/that/does/not/exist\"|" "${TEST_TEMP_DIR}/todo-summary.sh"
     run_scanner
     assert_success
 }

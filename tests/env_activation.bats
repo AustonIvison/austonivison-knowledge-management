@@ -52,12 +52,16 @@ setup() {
 @test "saved .km-editor choice overrides an inherited EDITOR" {
     # A global EDITOR=nvim (e.g. from ~/.bashrc) must NOT beat the vim chosen at setup.
     printf 'vim\n' > "${TEST_TEMP_DIR}/.km-editor"
-    EDITOR=nvim KM_EDITOR_FILE="${TEST_TEMP_DIR}/.km-editor" source "${PROJECT_ROOT}/env.sh"
+    export EDITOR=nvim
+    export KM_EDITOR_FILE="${TEST_TEMP_DIR}/.km-editor"
+    source "${PROJECT_ROOT}/env.sh"
     [ "$EDITOR" = "vim" ]
 }
 
 @test "inherited EDITOR is used when there is no saved choice" {
-    EDITOR=emacs KM_EDITOR_FILE="${TEST_TEMP_DIR}/no-such-file" source "${PROJECT_ROOT}/env.sh"
+    export EDITOR=emacs
+    export KM_EDITOR_FILE="${TEST_TEMP_DIR}/no-such-file"
+    source "${PROJECT_ROOT}/env.sh"
     [ "$EDITOR" = "emacs" ]
 }
 
@@ -76,10 +80,10 @@ setup() {
     local rc="${HOME}/.zshrc"
     echo "# original content" > "$rc"
     local before_hash
-    before_hash="$(sha256sum "$rc" | cut -d' ' -f1)"
+    before_hash="$(file_sha256 "$rc")"
     source "${PROJECT_ROOT}/env.sh"
     local after_hash
-    after_hash="$(sha256sum "$rc" | cut -d' ' -f1)"
+    after_hash="$(file_sha256 "$rc")"
     [ "$before_hash" = "$after_hash" ]
 }
 
@@ -169,7 +173,8 @@ _make_stubs() {
         vr pattern
     "
     assert_success
-    assert_output "vim +42 notes/foo.md"
+    assert_output --partial "config/vim/vimrc"
+    assert_output --partial "+42 notes/foo.md"
 }
 
 @test "vg delegates to vr — opens vim at correct file and line" {
@@ -182,7 +187,8 @@ _make_stubs() {
         vg pattern
     "
     assert_success
-    assert_output "vim +7 notes/bar.md"
+    assert_output --partial "config/vim/vimrc"
+    assert_output --partial "+7 notes/bar.md"
 }
 
 @test "vr returns 0 when fzf finds no match" {
@@ -228,7 +234,8 @@ _make_stubs() {
         vf
     "
     assert_success
-    assert_output "vim notes/my-note.md"
+    assert_output --partial "config/vim/vimrc"
+    assert_output --partial "notes/my-note.md"
 }
 
 @test "vf returns 0 when fzf finds no file" {

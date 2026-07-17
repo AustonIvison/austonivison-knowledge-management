@@ -31,6 +31,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="${KM_PROJECT_DIR:-${SCRIPT_DIR}}"
 # shellcheck source=scripts/lib/platform.sh
 source "${SCRIPT_DIR}/scripts/lib/platform.sh"
+_require_bash4
 # shellcheck source=scripts/lib/vault.sh
 source "${SCRIPT_DIR}/scripts/lib/vault.sh"
 VAULT_DIR="$(km_vault_dir "${SCRIPT_DIR}")"

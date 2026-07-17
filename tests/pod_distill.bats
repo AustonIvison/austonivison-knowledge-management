@@ -194,7 +194,7 @@ make_note() {
         skip "claude resolvable from /usr/bin:/bin — absence not testable"
     fi
     local note; note="$(make_note)"
-    run "${OKM}" distill "$note"
+    run env PATH="/usr/bin:/bin" "${BASH}" "${OKM}" distill "$note"
     assert_failure
     assert_output --partial "'claude' CLI not found"
 }

@@ -114,7 +114,7 @@ setup() {
     run "${PROJECT_ROOT}/bin/okm" today
     local dow week_start
     dow="$(date +%u)"
-    week_start="$(date -d "-$((dow - 1)) days" +%F)"
+    week_start="$(test_date_add "$(date +%F)" "-$((dow - 1))")"
     [ -f "${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md" ]
 }
 

@@ -9,9 +9,9 @@ setup() {
     mkdir -p "${TEST_TEMP_DIR}/scripts/lib"
     cp "${PROJECT_ROOT}/scripts/lib/"*.sh "${TEST_TEMP_DIR}/scripts/lib/"
     cp "${PROJECT_ROOT}/scripts/weekly-tasks.sh" "${TEST_TEMP_DIR}/weekly-tasks.sh"
-    sed -i "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"${TEST_TEMP_DIR}\"|" "${TEST_TEMP_DIR}/weekly-tasks.sh"
-    sed -i "s|^PROJECT_DIR=.*|PROJECT_DIR=\"${FAKE_PROJECT_DIR}\"|" "${TEST_TEMP_DIR}/weekly-tasks.sh"
-    sed -i "s|^OUTPUT_FILE=.*|OUTPUT_FILE=\"${FAKE_PROJECT_DIR}/public/inbox/weekly-test.md\"|" "${TEST_TEMP_DIR}/weekly-tasks.sh"
+    sed_in_place "s|^SCRIPT_DIR=.*|SCRIPT_DIR=\"${TEST_TEMP_DIR}\"|" "${TEST_TEMP_DIR}/weekly-tasks.sh"
+    sed_in_place "s|^PROJECT_DIR=.*|PROJECT_DIR=\"${FAKE_PROJECT_DIR}\"|" "${TEST_TEMP_DIR}/weekly-tasks.sh"
+    sed_in_place "s|^OUTPUT_FILE=.*|OUTPUT_FILE=\"${FAKE_PROJECT_DIR}/public/inbox/weekly-test.md\"|" "${TEST_TEMP_DIR}/weekly-tasks.sh"
     export OBSIDIAN_VAULT="${FAKE_VAULT_DIR}"
     chmod +x "${TEST_TEMP_DIR}/weekly-tasks.sh"
 }

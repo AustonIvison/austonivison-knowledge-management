@@ -34,6 +34,22 @@ setup() {
     assert_failure
 }
 
+@test "verification selects the host Obsidian installation path" {
+    run bash "${PROJECT_ROOT}/scripts/verify-km.sh"
+    if [ "$(uname -s)" = "Darwin" ]; then
+        assert_output --partial "Native Obsidian"
+        assert_output --partial "native macOS app network access is not forcibly revoked"
+    else
+        assert_output --partial "Flatpak / Obsidian"
+        assert_output --partial "Obsidian has network access"
+    fi
+}
+
+@test "verification checks for Bash 4 or newer" {
+    run bash "${PROJECT_ROOT}/scripts/verify-km.sh"
+    assert_output --partial "bash ${BASH_VERSION}"
+}
+
 @test "verify checks project binaries in SCRIPT_DIR/bin not ~/bin" {
     # verify-km.sh should reference SCRIPT_DIR/bin, not HOME/bin
     grep -q 'SCRIPT_DIR.*bin' "${PROJECT_ROOT}/scripts/verify-km.sh"

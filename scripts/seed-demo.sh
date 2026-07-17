@@ -14,6 +14,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KM_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=scripts/lib/platform.sh
+source "${SCRIPT_DIR}/lib/platform.sh"
 VAULT="${OBSIDIAN_VAULT:-${KM_ROOT}}"
 TEMPLATES="${KM_ROOT}/public/inbox/templates"
 
@@ -66,7 +68,7 @@ render_template() {
             -e "s|{{YEAR}}|$(date +%Y)|g" \
             -e "s|{{ARCHIVED_DATE}}|${today}|g" \
             -e "s|{{WEEK_START}}|${today}|g" \
-            -e "s|{{WEEK_END}}|$(date -d '+6 days' +%Y-%m-%d 2>/dev/null || date -v+6d +%Y-%m-%d)|g" \
+            -e "s|{{WEEK_END}}|$(_date_add "${today}" "+6")|g" \
         > "$dst"
 }
 
@@ -96,7 +98,7 @@ seed() {
     local today year week_end
     today="$(date +%Y-%m-%d)"
     year="$(date +%Y)"
-    week_end="$(date -d '+6 days' +%Y-%m-%d 2>/dev/null || date -v+6d +%Y-%m-%d)"
+    week_end="$(_date_add "${today}" "+6")"
 
     render_template "${TEMPLATES}/daily-template.md"           "${VAULT}/public/daily/demo-${today}.md"                              "${today}"
     render_template "${TEMPLATES}/note-template.md"            "${VAULT}/public/inbox/demo-meeting-notes.md"                          "Demo Meeting Notes"
@@ -110,7 +112,7 @@ seed() {
     render_template "${TEMPLATES}/archive-template.md"         "${VAULT}/public/archive/demo-completed-project.md"                    "Demo Completed Project"
 
     # 1x1 placeholder PNG.
-    printf '%s' "${DEMO_PNG_B64}" | base64 -d > "${VAULT}/public/attachments/demo-screenshot.png"
+    printf '%s' "${DEMO_PNG_B64}" | _base64_decode > "${VAULT}/public/attachments/demo-screenshot.png"
 
     cat <<EOF
 Demo dataset seeded into ${VAULT}.

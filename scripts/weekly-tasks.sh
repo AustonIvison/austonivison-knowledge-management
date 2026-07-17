@@ -26,6 +26,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="${KM_PROJECT_DIR:-${SCRIPT_DIR}}"
 # shellcheck source=scripts/lib/platform.sh
 source "${SCRIPT_DIR}/scripts/lib/platform.sh"
+_require_bash4
 # shellcheck source=scripts/lib/vault.sh
 source "${SCRIPT_DIR}/scripts/lib/vault.sh"
 VAULT_DIR="$(km_vault_dir "${SCRIPT_DIR}")"
@@ -110,8 +111,8 @@ day_section+="---
 # --- Find the previous week's file for Monday carry-forward ---
 get_prev_week_file() {
     local prev_monday prev_sunday prev_file
-    prev_monday="$(date -d "${WEEK_START} -7 days" +%F)"
-    prev_sunday="$(date -d "${WEEK_END} -7 days" +%F)"
+    prev_monday="$(_date_add "${WEEK_START}" "-7")"
+    prev_sunday="$(_date_add "${WEEK_END}" "-7")"
     prev_file="${PROJECT_DIR}/public/inbox/weekly-${prev_monday}-to-${prev_sunday}.md"
     if [[ -f "$prev_file" ]]; then
         echo "$prev_file"

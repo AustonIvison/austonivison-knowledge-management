@@ -12,22 +12,22 @@ Open-source knowledge OS for Obsidian users who live in Vim, Neovim, and the CLI
 
 | Tool | Role | Installed by |
 |---|---|---|
-| Obsidian | GUI vault viewer, graph view | Flatpak (network revoked) |
-| Vim | Default terminal editor | apt; project vimrc via `bin/vim` |
+| Obsidian | GUI vault viewer, graph view | Flatpak on Linux; Homebrew Cask on macOS |
+| Vim | Default terminal editor | apt/Homebrew; project vimrc via `bin/vim` |
 | Neovim + obsidian.nvim | Optional editor + vault integration | **opt-in at setup** → `bin/nvim` + lazy.nvim |
 | lazygit | TUI git client | `bin/lazygit` via GitHub release |
 | okm | Vault CLI | `bin/okm` (tracked in git) |
 | yt-dlp / whisperX / spotdl | Media transcription | Python venv |
-| ffmpeg / mpv | Audio/video processing | apt |
-| ripgrep / fzf | Search and fuzzy picking | apt |
+| ffmpeg / mpv | Audio/video processing | apt/Homebrew |
+| ripgrep / fzf | Search and fuzzy picking | apt/Homebrew |
 
-**Platform:** Debian/Ubuntu (apt + Flatpak), x86_64/arm64. macOS and other distros not yet supported.
+**Platforms:** Debian/Ubuntu (apt + Flatpak) and macOS (Homebrew), x86_64/arm64. Other Linux distributions are not yet supported.
 
 ---
 
 ## Setup
 
-**Prerequisites:** `bash` ≥ 4.0, `git`, `curl`, `flatpak`, `sudo` access, GitHub account. Debian/Ubuntu only.
+**Prerequisites:** `git`, `curl`, and a GitHub account. Debian/Ubuntu also needs `bash` >= 4, `flatpak`, and `sudo`; macOS needs [Homebrew](https://brew.sh/) and may use its default zsh shell. Setup installs Homebrew Bash for project commands but does not install Homebrew itself.
 
 > **Fork first.** On GitHub: fork this repo, then go to your fork's **Settings → General → Repository name** and rename it to `{your-github-handle}-knowledge-management`. Clone *your fork*, not this repo, so `okm sync` pushes to your private copy.
 
@@ -40,6 +40,8 @@ bash tests/run_all.sh
 ```
 
 > **Note:** Run `bash scripts/setup-km.sh` before `direnv allow .` — setup installs `direnv` itself.
+>
+> **macOS/zsh:** Run the Bash command above from zsh; do not run the script with `zsh`. Setup adds one idempotent `direnv hook zsh` line to `~/.zshrc`, and `env.sh` places Homebrew Bash on `PATH`.
 
 Setup prompts: **Track notes in git?** (default: yes; pre-set with `KM_TRACK_NOTES=true|false`) and **Editor?** (default: vim; choose `nvim` to also download Neovim + plugins; pre-set with `KM_EDITOR=vim|nvim`). The choice is saved to `.km-editor` and honored by `env.sh`. Logs at `~/.local/log/setup-km-*.log`.
 
@@ -122,7 +124,7 @@ Vault follows [PARA](https://fortelabs.com/blog/para/). All agent/loom output be
 - **Secrets never tracked.** `.gitignore` excludes `.env*`, `*.pem`, `*.key`, `*.crt`, `*credentials*`, `id_rsa*`, `id_ed25519*`.
 - AI assistants don't read `private/`.
 - `okm grep/tags/files/tagged/recent` skip `private/` by default (`KM_INCLUDE_PRIVATE=1` to scan).
-- Never touch user global configs (`~/.config/nvim`, `~/.zshrc`, etc.).
+- Project variables and editor settings never go into global configs. Setup may add one generic direnv hook to `~/.bashrc` or `~/.zshrc`.
 - **WSL2:** setup installs a Nerd Font to Windows fonts and may update Windows Terminal. Disable: `KM_INSTALL_FONT=0`.
 
 ---
@@ -232,7 +234,9 @@ Advanced: `lazygit -p "$(okm path)"` or `git -C "$(okm path)" <cmd>`.
 Encrypts `public/daily/*.md` and `public/inbox/*.md` in the remote (AES-256-CTR). Plaintext locally, opaque on remote.
 
 ```bash
-sudo apt install git-crypt && cd "$(okm path)" && git-crypt init
+# Install first: sudo apt install git-crypt  # Debian/Ubuntu
+#             or brew install git-crypt      # macOS
+cd "$(okm path)" && git-crypt init
 git-crypt export-key ~/git-crypt-km.key   # BACK THIS UP
 printf 'public/daily/*.md filter=git-crypt diff=git-crypt\npublic/inbox/*.md filter=git-crypt diff=git-crypt\n' >> .gitattributes
 git add .gitattributes && git commit -m "configure git-crypt"
@@ -247,7 +251,8 @@ git add .gitattributes && git commit -m "configure git-crypt"
 
 | Tool | Enforcement |
 |---|---|
-| Obsidian | Flatpak `--unshare=network` |
+| Obsidian (Linux) | Flatpak `--unshare=network` |
+| Obsidian (macOS) | Native app; setup warns because macOS has no equivalent enforced sandbox |
 | lazygit | `update.method: never` |
 | lazy.nvim | `checker = { enabled = false }` |
 
@@ -265,8 +270,8 @@ git add .gitattributes && git commit -m "configure git-crypt"
 |---|---|---|
 | **v0** | ✅ shipped | Core vault CLI, privacy boundary, hardened input |
 | **v1** | ✅ shipped (tagged `v1.0.0`) | Fork-safety, edge-case bugs, tagging gaps |
-| **v2** | 🟡 in progress | Media ingest (`okm pod`, `okm distill` shipped), trust infrastructure |
-| **v3** | 🔵 planned | Rust mirrors of v2 features, encryption key workflow, push-safety (destination-aware notes, server-side vault guard), macOS support, Portable Vault Specification (PVS) |
+| **v2** | 🟡 in progress | Media ingest (`okm pod`, `okm distill` shipped), macOS support, trust infrastructure |
+| **v3** | 🔵 planned | Rust mirrors of v2 features, encryption key workflow, push-safety (destination-aware notes, server-side vault guard), Portable Vault Specification (PVS) |
 
 Full item lists: [`docs/roadmap.md`](docs/roadmap.md). Project-structure simplification (root keeps `README.md` only; all other markdown lives in `docs/`) — rationale and rejected alternatives: [`docs/roadmap.md#project-structure-simplification`](docs/roadmap.md#project-structure-simplification). v1 specs + reproduction steps: `tests/v1_spec.bats`. v0 shipped clusters and regression guard: [`docs/design-notes.md`](docs/design-notes.md). Fork-safety architecture: [`docs/design-notes.md#fork-safety-architecture`](docs/design-notes.md#fork-safety-architecture).
 

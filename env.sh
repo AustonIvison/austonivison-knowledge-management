@@ -17,6 +17,22 @@ else
     KM_ROOT="$(cd "$(dirname "$0")" && pwd)"
 fi
 
+# --- Homebrew on macOS (modern Bash + project dependencies) ---
+if [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
+    _km_brew=""
+    if command -v brew >/dev/null 2>&1; then
+        _km_brew="$(brew --prefix 2>/dev/null)"
+    elif [ -x /opt/homebrew/bin/brew ]; then
+        _km_brew="/opt/homebrew"
+    elif [ -x /usr/local/bin/brew ]; then
+        _km_brew="/usr/local"
+    fi
+    if [ -n "${_km_brew}" ] && [[ ":${PATH}:" != *":${_km_brew}/bin:"* ]]; then
+        export PATH="${_km_brew}/bin:${PATH}"
+    fi
+    unset _km_brew
+fi
+
 # --- Project binaries first on PATH (dedup guard for repeated sourcing) ---
 [[ ":${PATH}:" != *":${KM_ROOT}/bin:"* ]] && export PATH="${KM_ROOT}/bin:${PATH}"
 
@@ -34,8 +50,16 @@ export KM_TRACK_NOTES="${KM_TRACK_NOTES:-true}"
 # Without a valid UTF-8 locale, Neovim reports broken Unicode and icons won't render.
 # Check locale -a (installed locales) rather than locale (which echoes $LC_ALL).
 if ! locale -a 2>/dev/null | grep -qi 'en_US\.utf'; then
-    export LC_ALL=C.UTF-8
-    export LANG=C.UTF-8
+    if locale -a 2>/dev/null | grep -qi '^C\.UTF-8$'; then
+        export LC_ALL=C.UTF-8
+        export LANG=C.UTF-8
+    elif locale -a 2>/dev/null | grep -qi '^UTF-8$'; then
+        export LC_ALL=UTF-8
+        export LANG=UTF-8
+    else
+        export LC_ALL=C
+        export LANG=C
+    fi
 fi
 
 # --- Editor: vim by default; the saved project choice is authoritative ---

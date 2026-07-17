@@ -11,14 +11,12 @@ mkdir -p "${LOG_DIR}"
 
 # Rotate: keep only the last 5 log files.
 _rotate_logs() {
-    local logs
-    mapfile -t logs < <(find "${LOG_DIR}" -maxdepth 1 -name 'setup-km-*.log' \
-        -not -name "$(basename "${LOG_FILE}")" | sort -r)
-    local i=0
-    for f in "${logs[@]}"; do
+    local i=0 f
+    while IFS= read -r f; do
         i=$((i + 1))
         [ "$i" -ge 5 ] && rm -f "$f"
-    done
+    done < <(find "${LOG_DIR}" -maxdepth 1 -name 'setup-km-*.log' \
+        -not -name "$(basename "${LOG_FILE}")" | sort -r)
 }
 _rotate_logs
 
@@ -98,6 +96,58 @@ install_apt_packages() {
     sudo apt install -y "${to_install[@]}"
 }
 
+require_homebrew() {
+    if ! command -v brew >/dev/null 2>&1; then
+        log_error "Homebrew is required on macOS but was not found."
+        log_error "Install it from https://brew.sh/ and then re-run: bash scripts/setup-km.sh"
+        return 1
+    fi
+
+    HOMEBREW_PREFIX="$(brew --prefix)"
+    export HOMEBREW_PREFIX
+    case ":${PATH}:" in
+        *":${HOMEBREW_PREFIX}/bin:"*) ;;
+        *) export PATH="${HOMEBREW_PREFIX}/bin:${PATH}" ;;
+    esac
+    log_info "Homebrew: ${HOMEBREW_PREFIX}"
+}
+
+install_brew_packages() {
+    local packages=("$@")
+    local to_install=()
+
+    for pkg in "${packages[@]}"; do
+        if brew list --formula "${pkg}" >/dev/null 2>&1; then
+            log_info "SKIP: Homebrew formula '${pkg}' already installed"
+        else
+            log_info "QUEUE: Homebrew formula '${pkg}' will be installed"
+            to_install+=("${pkg}")
+        fi
+    done
+
+    if [ "${#to_install[@]}" -eq 0 ]; then
+        log_info "SKIP: all Homebrew formulae already present"
+        return 0
+    fi
+
+    log_info "Installing Homebrew formulae: ${to_install[*]}"
+    brew install "${to_install[@]}"
+    hash -r
+}
+
+ensure_homebrew_bash() {
+    local brew_bash="${HOMEBREW_PREFIX}/bin/bash"
+    if [ ! -x "${brew_bash}" ]; then
+        log_error "Homebrew Bash was not installed at ${brew_bash}"
+        return 1
+    fi
+    if ! "${brew_bash}" -c '[ "${BASH_VERSINFO[0]}" -ge 4 ]'; then
+        log_error "Homebrew Bash must be version 4 or newer: ${brew_bash}"
+        return 1
+    fi
+    log_info "OK: modern Bash available at ${brew_bash}"
+}
+
 ensure_flathub_remote() {
     if flatpak remotes --user --columns=name 2>/dev/null | grep -qx 'flathub'; then
         log_info "SKIP: Flathub remote already configured (user installation)"
@@ -107,12 +157,21 @@ ensure_flathub_remote() {
     fi
 }
 
-install_obsidian() {
+install_obsidian_flatpak() {
     if flatpak list --user --app --columns=application 2>/dev/null | grep -qx 'md.obsidian.Obsidian'; then
         log_info "SKIP: Obsidian flatpak already installed (user installation)"
     else
         log_info "ACTION: Installing Obsidian flatpak (user installation)"
         flatpak install --user -y flathub md.obsidian.Obsidian
+    fi
+}
+
+install_obsidian_macos() {
+    if open -Ra "Obsidian" >/dev/null 2>&1; then
+        log_info "SKIP: native Obsidian application already installed"
+    else
+        log_info "ACTION: Installing native Obsidian application with Homebrew Cask"
+        brew install --cask obsidian
     fi
 }
 
@@ -290,19 +349,14 @@ ensure_upstream_remote() {
 }
 
 detect_platform() {
-    local os arch
-    os="$(uname -s)"
-    arch="$(uname -m)"
-    case "${os}" in
-        Linux)  PLATFORM_OS="linux" ;;
-        Darwin) PLATFORM_OS="macos" ;;
-        *)      log_error "Unsupported OS: ${os}"; exit 1 ;;
-    esac
-    case "${arch}" in
-        x86_64|amd64)  PLATFORM_ARCH="x86_64" ;;
-        aarch64|arm64) PLATFORM_ARCH="arm64" ;;
-        *)             log_error "Unsupported architecture: ${arch}"; exit 1 ;;
-    esac
+    PLATFORM_OS="$(_platform_os)" || {
+        log_error "Unsupported OS: $(uname -s)"
+        exit 1
+    }
+    PLATFORM_ARCH="$(_platform_arch)" || {
+        log_error "Unsupported architecture: $(uname -m)"
+        exit 1
+    }
     log_info "Platform: ${PLATFORM_OS}/${PLATFORM_ARCH}"
 }
 
@@ -375,7 +429,7 @@ install_lazygit() {
     esac
     curl -fsSL -o "${tmp_dir}/lazygit.tar.gz" \
         "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${version}_${lg_os}_${lg_arch}.tar.gz"
-    tar --no-absolute-file-names -xf "${tmp_dir}/lazygit.tar.gz" -C "${BIN_DIR}" lazygit
+    tar -xf "${tmp_dir}/lazygit.tar.gz" -C "${BIN_DIR}" lazygit
     chmod +x "${BIN_DIR}/lazygit"
     rm -rf "${tmp_dir}"
     log_info "OK: lazygit installed at ${BIN_DIR}/lazygit"
@@ -604,14 +658,14 @@ is_wsl2() {
     grep -qi 'microsoft' /proc/version 2>/dev/null
 }
 
-# Install direnv and hook it into ~/.bashrc so the project environment activates
-# automatically whenever the user cd's into the project directory.
-# Uses the official install script (https://direnv.net/install.sh) into
-# ~/.local/bin — no sudo required, always gets the current release.
-# Only ~/.bashrc is touched (one generic line); all project vars stay in .envrc.
+# Install direnv and hook it into the active shell so the project environment
+# activates automatically whenever the user enters the project directory.
 install_direnv() {
     if command -v direnv >/dev/null 2>&1; then
         log_info "SKIP: direnv already installed at $(command -v direnv)"
+    elif [ "${PLATFORM_OS:-}" = "macos" ]; then
+        log_info "ACTION: Installing direnv with Homebrew"
+        brew install direnv
     else
         log_info "ACTION: Installing direnv via official install script"
         local bin_dir="${HOME}/.local/bin"
@@ -622,26 +676,54 @@ install_direnv() {
         if command -v direnv >/dev/null 2>&1; then
             log_info "OK: direnv installed to ${bin_dir}"
         else
-            log_error "FAIL: direnv install failed — check network or install manually: sudo apt install direnv"
+            log_error "FAIL: direnv install failed — check network or install manually: $(_pkg_install_hint direnv)"
             return 1
         fi
     fi
 
-    local bashrc="${HOME}/.bashrc"
-    local hook_line='eval "$(direnv hook bash)"'
-    if grep -qF 'direnv hook bash' "${bashrc}" 2>/dev/null; then
-        log_info "SKIP: direnv hook already present in ${bashrc}"
-    else
-        log_info "ACTION: Adding direnv hook to ${bashrc}"
+    local shell_name="${KM_SHELL:-${SHELL:-}}"
+    shell_name="${shell_name##*/}"
+    if [ -z "${shell_name}" ]; then
+        if [ "${PLATFORM_OS:-linux}" = "macos" ]; then
+            shell_name="zsh"
+        else
+            shell_name="bash"
+        fi
+    fi
+
+    local shell_rc hook_line hook_marker
+    case "${shell_name}" in
+        zsh)
+            shell_rc="${HOME}/.zshrc"
+            hook_line='eval "$(direnv hook zsh)"'
+            hook_marker='direnv hook zsh'
+            ;;
+        bash)
+            shell_rc="${HOME}/.bashrc"
+            hook_line='eval "$(direnv hook bash)"'
+            hook_marker='direnv hook bash'
+            ;;
+        *)
+            log_warn "Unsupported shell '${shell_name}' — add the appropriate direnv hook manually"
+            shell_rc=""
+            ;;
+    esac
+
+    if [ -n "${shell_rc}" ] && grep -qF "${hook_marker}" "${shell_rc}" 2>/dev/null; then
+        log_info "SKIP: direnv ${shell_name} hook already present in ${shell_rc}"
+    elif [ -n "${shell_rc}" ]; then
+        log_info "ACTION: Adding direnv ${shell_name} hook to ${shell_rc}"
         printf '\n# direnv — auto-activate project environments on cd\n%s\n' \
-            "${hook_line}" >> "${bashrc}"
-        log_info "OK: direnv hook added to ${bashrc}"
+            "${hook_line}" >> "${shell_rc}"
+        log_info "OK: direnv hook added to ${shell_rc}"
+    else
+        log_warn "No shell startup file changed; configure direnv for '${shell_name}' manually"
     fi
 
     if [ -f "${SCRIPT_DIR}/.envrc" ]; then
         log_info "ACTION: Allowing direnv for ${SCRIPT_DIR}"
         direnv allow "${SCRIPT_DIR}"
-        log_info "OK: direnv allowed — open a new terminal tab and cd into the project"
+        log_info "OK: direnv allowed — open a new terminal tab and enter the project"
     fi
 }
 
@@ -666,6 +748,12 @@ install_vault_privacy_hook() {
 # After this, Obsidian cannot initiate outbound connections regardless of its
 # internal settings. Explicit git push/pull (via okm sync or lazygit) is unaffected.
 ensure_obsidian_offline() {
+    if [ "${PLATFORM_OS:-}" = "macos" ]; then
+        log_warn "macOS native Obsidian cannot be network-sandboxed by this setup."
+        log_warn "Automatic plugin update checks remain disabled, but application network access is not forcibly revoked."
+        return 0
+    fi
+
     local override_file="${HOME}/.local/share/flatpak/overrides/md.obsidian.Obsidian"
 
     if [ -f "${override_file}" ] && grep -q '!network' "${override_file}"; then
@@ -690,15 +778,27 @@ if $DRY_RUN; then
     exit 0
 fi
 
-log_info "==> Installing packages"
-install_apt_packages vim git ripgrep fzf xdg-utils flatpak xclip wl-clipboard curl unzip \
-    ffmpeg mpv python3-venv python3-pip
+if [ "${PLATFORM_OS}" = "macos" ]; then
+    log_info "==> Checking Homebrew prerequisite"
+    require_homebrew
 
-log_info "==> Ensuring Flathub is configured"
-ensure_flathub_remote
+    log_info "==> Installing Homebrew packages"
+    install_brew_packages bash git vim ripgrep fzf ffmpeg mpv python direnv
+    ensure_homebrew_bash
 
-log_info "==> Installing Obsidian"
-install_obsidian
+    log_info "==> Installing native Obsidian"
+    install_obsidian_macos
+else
+    log_info "==> Installing apt packages"
+    install_apt_packages vim git ripgrep fzf xdg-utils flatpak xclip wl-clipboard curl unzip \
+        ffmpeg mpv python3-venv python3-pip
+
+    log_info "==> Ensuring Flathub is configured"
+    ensure_flathub_remote
+
+    log_info "==> Installing Obsidian Flatpak"
+    install_obsidian_flatpak
+fi
 
 log_info "==> Creating vault structure"
 ensure_dir "${VAULT_DIR}/public/daily"
@@ -862,9 +962,9 @@ echo "  source env.sh"
 echo ""
 echo "Then use okm:"
 echo "  okm today"
-echo "  okm new \"Linux notes\""
-echo "  okm capture \"read about systemd\""
+echo "  okm new \"Project notes\""
+echo "  okm capture \"follow up on today's reading\""
 echo "  okm sync \"notes update\""
 echo ""
-echo "No global config files were modified."
-echo "Your ~/.zshrc, ~/.config/nvim, and ~/.config/lazygit are untouched."
+echo "Project-specific settings remain isolated from your global editor configs."
+echo "Setup may add one generic direnv hook to your active shell startup file."

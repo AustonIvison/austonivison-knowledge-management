@@ -47,6 +47,36 @@ setup() {
     assert_output "${FAKE_VAULT_DIR}"
 }
 
+@test "okm obs uses the platform Obsidian launcher" {
+    local fake_bin="${TEST_TEMP_DIR}/obsidian-bin"
+    local launch_log="${TEST_TEMP_DIR}/obsidian-launch.log"
+    mkdir -p "${fake_bin}"
+
+    if [ "$(uname -s)" = "Darwin" ]; then
+        cat > "${fake_bin}/open" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${launch_log}"
+EOF
+        chmod +x "${fake_bin}/open"
+    else
+        cat > "${fake_bin}/flatpak" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "${launch_log}"
+EOF
+        chmod +x "${fake_bin}/flatpak"
+    fi
+
+    run env PATH="${fake_bin}:${PATH}" "${OKM}" obs
+    assert_success
+    sleep 0.1
+
+    if [ "$(uname -s)" = "Darwin" ]; then
+        grep -q -- '-a Obsidian' "${launch_log}"
+    else
+        grep -q 'run md.obsidian.Obsidian' "${launch_log}"
+    fi
+}
+
 # === okm new ===
 
 @test "okm new creates note with frontmatter" {
@@ -98,7 +128,7 @@ setup() {
     run "${OKM}" today
     local dow week_start
     dow="$(date +%u)"
-    week_start="$(date -d "-$((dow - 1)) days" +%F)"
+    week_start="$(test_date_add "$(date +%F)" "-$((dow - 1))")"
     local file="${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md"
     [ -f "$file" ]
     grep -q "week_start: ${week_start}" "$file"
@@ -112,17 +142,17 @@ setup() {
 @test "okm today is idempotent (does not overwrite)" {
     local dow week_start
     dow="$(date +%u)"
-    week_start="$(date -d "-$((dow - 1)) days" +%F)"
+    week_start="$(test_date_add "$(date +%F)" "-$((dow - 1))")"
     local file="${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md"
     # Create it first
     run "${OKM}" today
     [ -f "$file" ]
     local original_hash
-    original_hash="$(sha256sum "$file" | cut -d' ' -f1)"
+    original_hash="$(file_sha256 "$file")"
     # Run again
     run "${OKM}" today
     local second_hash
-    second_hash="$(sha256sum "$file" | cut -d' ' -f1)"
+    second_hash="$(file_sha256 "$file")"
     [ "$original_hash" = "$second_hash" ]
 }
 

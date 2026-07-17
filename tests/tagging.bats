@@ -446,7 +446,7 @@ body"
     run "${OKM}" tag public/inbox/perms.md footag
     assert_success
     local perms
-    perms=$(stat -c '%a' "${FAKE_VAULT_DIR}/public/inbox/perms.md")
+    perms=$(file_mode "${FAKE_VAULT_DIR}/public/inbox/perms.md")
     [ "$perms" = "644" ]
 }
 
@@ -460,6 +460,6 @@ body"
     run "${OKM}" untag public/inbox/perms2.md keeptag
     assert_success
     local perms
-    perms=$(stat -c '%a' "${FAKE_VAULT_DIR}/public/inbox/perms2.md")
+    perms=$(file_mode "${FAKE_VAULT_DIR}/public/inbox/perms2.md")
     [ "$perms" = "664" ]
 }

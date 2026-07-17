@@ -18,6 +18,7 @@ Fork-safety, edge-case bugs, tagging gaps. Specs and reproduction steps: `tests/
 |---|---|
 | `okm pod <file>` — local audio note, whisperX transcription | ✅ shipped |
 | `okm distill <note>` — AI bullet summary (Claude / Ollama) | ✅ shipped |
+| macOS workstation support — Homebrew, zsh activation, BSD userland, native Obsidian | ✅ shipped |
 | Phase 1 below (`doctor`, `--dry-run`, `eject-check`, schema) | Open; candidate v2 scope — no AI required, low effort |
 
 ### v3 — planned
@@ -25,8 +26,7 @@ Fork-safety, edge-case bugs, tagging gaps. Specs and reproduction steps: `tests/
 - **Rust mirrors of v2 features** — *moved from v2 (2026-06-10).* v3 explicitly ports v2's Bash/Python utilities to Rust per the README performance policy: only mirror what crosses the >1s / hot-loop bar.
 - **Encryption** — *moved from v2 (2026-06-10).* `okm crypt init` (git-crypt) shipped; remaining v3 scope: document the key backup/restore workflow.
 - **Destination-aware note publishing** — `.gitignore` is destination-blind, so pushing `public/` notes to a private personal remote today needs manual `.gitignore` opt-in (`public/inbox/*.md` line) plus an authenticated `gh` for the fail-closed visibility check in `km_check_url_is_private`. v3: notes flow to the private vault remote and never to the public tool repo without manual surgery.
-- **Server-side vault-content guard** — CI check on the public `knowledge-management` repo that rejects any push/PR containing vault paths (reuse the `km_path_is_vault_content` predicate), backing the client-side pre-push hook with a hard wall. Blocked on re-enabling Actions.
-- **macOS support** — *postponed from v2 (2026-06-09): no Mac hardware to test against, and macOS behavior can't be faithfully simulated on Linux.* Scope when picked up: Homebrew package install path in `scripts/setup-km.sh` (a draft `install_brew_packages` helper was written and reverted — trivial to recreate), BSD vs GNU userland differences (`sed -i`, `date`, `realpath`), and `open` vs `xdg-open`/flatpak launchers.
+- **Server-side vault-content guard** — CI check on the public `knowledge-management` repo that rejects any push/PR containing vault paths (reuse the `km_path_is_vault_content` predicate), backing the client-side pre-push hook with a hard wall.
 - **Portable Vault Specification (PVS)** — see `docs/pvs.md`; includes the tool/vault repo split deferred from the structure plan below.
 - Phases 2–3 below (agent legibility, synthesis layer) slot into v3+ as design firms up.
 

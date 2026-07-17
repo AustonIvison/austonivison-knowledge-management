@@ -228,7 +228,8 @@ tags: [safe]
 }
 
 @test "fuzz: okm open with symlink-like path" {
-    run "${OKM}" open "/proc/self/environ"
+    ln -s /etc "${FAKE_VAULT_DIR}/public/inbox/outside"
+    run "${OKM}" open "public/inbox/outside/passwd"
     assert_failure
 }
 
