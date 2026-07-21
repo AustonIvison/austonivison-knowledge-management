@@ -46,10 +46,18 @@ CronCreate: "3 15 * * *" — PARA TODO scan, 15:00 daily
 **System crontab (persistent across reboots):**
 
 ```bash
-# Add with: crontab -e (replace $KM with your project path)
+# Debian/Ubuntu: add with crontab -e (replace $KM with your project path)
 3 7 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
 3 12 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
 3 15 * * * /usr/bin/bash $KM/scripts/todo-summary.sh --output
+```
+
+On macOS, run `brew --prefix` once and replace `<brew-prefix>` below (`/opt/homebrew` on Apple Silicon, `/usr/local` on Intel):
+
+```bash
+3 7 * * * <brew-prefix>/bin/bash $KM/scripts/todo-summary.sh --output
+3 12 * * * <brew-prefix>/bin/bash $KM/scripts/todo-summary.sh --output
+3 15 * * * <brew-prefix>/bin/bash $KM/scripts/todo-summary.sh --output
 ```
 
 ### Output
@@ -96,10 +104,13 @@ Runs daily at **07:00**, **12:00**, and **15:00**.
 **System crontab (persistent):**
 
 ```bash
+# Debian/Ubuntu
 0 7 * * * /usr/bin/bash $KM/scripts/weekly-tasks.sh --output
 0 12 * * * /usr/bin/bash $KM/scripts/weekly-tasks.sh --output
 0 15 * * * /usr/bin/bash $KM/scripts/weekly-tasks.sh --output
 ```
+
+macOS uses the same schedules with `<brew-prefix>/bin/bash` instead of `/usr/bin/bash`.
 
 ---
 

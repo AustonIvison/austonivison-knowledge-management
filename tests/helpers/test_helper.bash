@@ -38,8 +38,10 @@ common_setup() {
     mkdir -p "${FAKE_PROJECT_DIR}/config/lazygit"
 
     # Copy lib scripts so setup-km.sh sources work in isolated tests
-    cp "${PROJECT_ROOT}/scripts/lib/privacy.sh" "${FAKE_PROJECT_DIR}/scripts/lib/privacy.sh"
-    cp "${PROJECT_ROOT}/scripts/lib/scan.sh"    "${FAKE_PROJECT_DIR}/scripts/lib/scan.sh" 2>/dev/null || true
+    cp "${PROJECT_ROOT}/scripts/lib/privacy.sh"  "${FAKE_PROJECT_DIR}/scripts/lib/privacy.sh"
+    cp "${PROJECT_ROOT}/scripts/lib/platform.sh" "${FAKE_PROJECT_DIR}/scripts/lib/platform.sh"
+    cp "${PROJECT_ROOT}/scripts/lib/scan.sh"     "${FAKE_PROJECT_DIR}/scripts/lib/scan.sh"
+    cp "${PROJECT_ROOT}/scripts/lib/vault.sh"    "${FAKE_PROJECT_DIR}/scripts/lib/vault.sh"
 
     # Create a fake vault directory
     FAKE_VAULT_DIR="${TEST_TEMP_DIR}/fake-vault"
@@ -87,4 +89,37 @@ create_vault_file() {
     local filepath="${FAKE_VAULT_DIR}/${filename}"
     mkdir -p "$(dirname "$filepath")"
     printf '%s\n' "$content" > "$filepath"
+}
+
+# Portable replacements for GNU-only test fixture commands.
+sed_in_place() {
+    local file="${!#}"
+    local args=("${@:1:$#-1}")
+    local tmp="${file}.sed.$$"
+    sed "${args[@]}" "${file}" > "${tmp}"
+    mv "${tmp}" "${file}"
+}
+
+file_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+file_mode() {
+    if stat -c '%a' "$1" >/dev/null 2>&1; then
+        stat -c '%a' "$1"
+    else
+        stat -f '%Lp' "$1"
+    fi
+}
+
+test_date_add() {
+    (
+        # shellcheck source=scripts/lib/platform.sh
+        source "${PROJECT_ROOT}/scripts/lib/platform.sh"
+        _date_add "$1" "$2"
+    )
 }

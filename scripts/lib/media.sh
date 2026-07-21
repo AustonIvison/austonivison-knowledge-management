@@ -408,9 +408,13 @@ distill_note() {
   local file; file="$(resolve_note "$note")"
   local base="${file%.md}"
   local out="${base}-distilled.md"
+  local vault_real source_rel out_rel
+  vault_real="$(_realpath -- "$VAULT")"
+  source_rel="${file#"$vault_real"/}"
+  out_rel="${out#"$vault_real"/}"
 
   if [ -f "$out" ]; then
-    echo "Distilled note already exists: ${out#"$VAULT"/}"
+    echo "Distilled note already exists: ${out_rel}"
     exec "$EDITOR_CMD" "$out"
   fi
 
@@ -442,7 +446,7 @@ distill_note() {
   cat > "$out" <<EOF
 ---
 title: "Distilled: ${safe_title}"
-source_note: "${file#"$VAULT"/}"
+source_note: "${source_rel}"
 distilled_by: ${model}
 created: $(iso_now)
 tags: [distilled, automated]
@@ -452,6 +456,6 @@ tags: [distilled, automated]
 
 ${summary:-<!-- distillation failed — check model configuration -->}
 EOF
-  echo "Created: ${out#"$VAULT"/}"
+  echo "Created: ${out_rel}"
   exec "$EDITOR_CMD" "$out"
 }

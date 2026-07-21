@@ -44,6 +44,7 @@ setup() {
 }
 
 @test "autocmds.lua is syntactically valid Lua" {
+    command -v nvim >/dev/null 2>&1 || skip "nvim not installed"
     run nvim --headless --clean -c "luafile $AUTOCMDS" -c "qa"
     [ "$status" -eq 0 ]
 }

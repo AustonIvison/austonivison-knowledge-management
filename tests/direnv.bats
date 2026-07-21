@@ -17,12 +17,13 @@ setup() {
 
 # Helper: run install_direnv from setup-km.sh in an isolated subprocess.
 # Uses env-var injection + single-quoted body to avoid quoting/expansion bugs.
-# $1 = fake HOME   $2 = fake SCRIPT_DIR   $3 = stub bin dir (contains fake direnv)
+# $1 = fake HOME   $2 = fake SCRIPT_DIR   $3 = stub bin dir   $4 = shell name
 _run_install_direnv() {
-    local fake_home="$1" fake_script_dir="$2" stub_bin="$3"
+    local fake_home="$1" fake_script_dir="$2" stub_bin="$3" shell_name="${4:-bash}"
     _ID_HOME="$fake_home" \
     _ID_SCRIPT="$fake_script_dir" \
     _ID_STUB="$stub_bin" \
+    _ID_SHELL="$shell_name" \
     _ID_PROJ="$PROJECT_ROOT" \
     bash -euo pipefail -c '
         LOG_FILE=/dev/null
@@ -31,6 +32,7 @@ _run_install_direnv() {
         log_error() { :; }
         HOME="$_ID_HOME"
         SCRIPT_DIR="$_ID_SCRIPT"
+        KM_SHELL="$_ID_SHELL"
         PATH="$_ID_STUB:$PATH"
         touch "$_ID_SCRIPT/.envrc"
         eval "$(sed -n "/^install_direnv()/,/^}/p" "$_ID_PROJ/scripts/setup-km.sh")"
@@ -53,12 +55,12 @@ _run_install_direnv() {
     grep -q 'source_env env.sh' "${PROJECT_ROOT}/.envrc"
 }
 
-@test "install_direnv only writes to ~/.bashrc not ~/.zshrc" {
-    # Extract install_direnv body and check it targets only ~/.bashrc
+@test "install_direnv supports bash and zsh startup files" {
     local fn_body
     fn_body="$(sed -n '/^install_direnv()/,/^}/p' "${PROJECT_ROOT}/scripts/setup-km.sh")"
     echo "$fn_body" | grep -q '\.bashrc'
-    ! echo "$fn_body" | grep -q '\.zshrc'
+    echo "$fn_body" | grep -q '\.zshrc'
+    echo "$fn_body" | grep -q 'direnv hook zsh'
 }
 
 # --- Behavioural checks via subprocess ---
@@ -90,17 +92,31 @@ _run_install_direnv() {
     [ "${count}" -eq 1 ]
 }
 
-@test "install_direnv does not write anything to ~/.zshrc" {
+@test "install_direnv writes only the zsh hook when shell is zsh" {
     local fh="${TEST_TEMP_DIR}/fh3" sb="${TEST_TEMP_DIR}/sb3"
     mkdir -p "${fh}" "${sb}"
     touch "${fh}/.bashrc" "${fh}/.zshrc"
     printf '#!/bin/bash\necho fake-direnv\n' > "${sb}/direnv"
     chmod +x "${sb}/direnv"
 
-    _run_install_direnv "${fh}" "${FAKE_PROJECT_DIR}" "${sb}"
+    _run_install_direnv "${fh}" "${FAKE_PROJECT_DIR}" "${sb}" zsh
 
-    run grep -c 'direnv' "${fh}/.zshrc"
+    grep -q 'direnv hook zsh' "${fh}/.zshrc"
+    run grep -c 'direnv' "${fh}/.bashrc"
     assert_output "0"
+}
+
+@test "install_direnv zsh hook write is idempotent" {
+    local fh="${TEST_TEMP_DIR}/fh-zsh" sb="${TEST_TEMP_DIR}/sb-zsh"
+    mkdir -p "${fh}" "${sb}"
+    touch "${fh}/.zshrc"
+    printf '#!/bin/bash\necho fake-direnv\n' > "${sb}/direnv"
+    chmod +x "${sb}/direnv"
+
+    _run_install_direnv "${fh}" "${FAKE_PROJECT_DIR}" "${sb}" zsh
+    _run_install_direnv "${fh}" "${FAKE_PROJECT_DIR}" "${sb}" zsh
+
+    [ "$(grep -c 'direnv hook zsh' "${fh}/.zshrc")" -eq 1 ]
 }
 
 @test "install_direnv skips hook write when already present" {

@@ -20,7 +20,23 @@ get_title() {
 
     if [[ "$filepath" == *.md ]]; then
         if [[ -f "$filepath" ]]; then
-            title="$(sed -n '/^---$/,/^---$/{/^title:/{ s/^title:[[:space:]]*//; s/^["'\''"]//; s/["'\''"]$//; p; q; }}' "$filepath")"
+            title="$(awk '
+                NR == 1 && $0 == "---" { in_frontmatter = 1; next }
+                in_frontmatter && $0 == "---" { exit }
+                in_frontmatter && /^title:[[:space:]]*/ {
+                    value = $0
+                    sub(/^title:[[:space:]]*/, "", value)
+                    first = substr(value, 1, 1)
+                    last = substr(value, length(value), 1)
+                    single_quote = sprintf("%c", 39)
+                    if ((first == "\"" && last == "\"") \
+                        || (first == single_quote && last == single_quote)) {
+                        value = substr(value, 2, length(value) - 2)
+                    }
+                    print value
+                    exit
+                }
+            ' "$filepath")"
         fi
         if [[ -z "$title" && -f "$filepath" ]]; then
             title="$(sed -n 's/^# *//p' "$filepath" | head -1)"

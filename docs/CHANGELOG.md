@@ -12,6 +12,7 @@ Notable changes to the knowledge-management tool. Format loosely follows
 - `docs/CHANGELOG.md` and `docs/SECURITY.md`.
 - `tools/` — home (with charter README) for MCP servers and other vault tools/integrations.
 - `setup-km.sh` first-run prompt for your editor (vim/nvim); the choice is saved to gitignored `.km-editor` and honored by `env.sh`.
+- First-class macOS workstation setup through Homebrew, including Apple Silicon/Intel binary selection, zsh direnv activation, native Obsidian launch, and macOS CI coverage.
 
 ### Changed
 - `okm today` now opens **this week's** note — `YYYY-MM-DD-weekly.md` (Monday start, Mon–Sun) — instead of a per-day file.
@@ -20,6 +21,7 @@ Notable changes to the knowledge-management tool. Format loosely follows
 - Media ingest (`spot`, `yt`, `pod`, `distill`) extracted from `bin/okm` into `scripts/lib/media.sh`.
 - Pre-push privacy guard now has a single tracked home — `scripts/hooks/pre-push`, activated via `core.hooksPath` by `okm port` — replacing the previous generated hook.
 - Project structure simplified: root keeps `README.md` only; all other markdown lives under `docs/` (`CONTRIBUTING.md`, `ORCHESTRATOR.md`, `design-notes.md`, `pvs.md`).
+- Shell portability now uses shared BSD/GNU date and path helpers; tests no longer require GNU `sed`, `date`, or checksum commands on macOS.
 
 ## v1.0.0 — 2026-06-09
 

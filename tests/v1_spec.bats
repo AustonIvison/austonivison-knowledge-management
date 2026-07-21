@@ -96,7 +96,7 @@ tags: [source/spotify]
     assert_success
     local dow week_start
     dow=$(date +%u)
-    week_start=$(date -d "-$((dow - 1)) days" +%F)
+    week_start=$(test_date_add "$(date +%F)" "-$((dow - 1))")
     [ -f "${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md" ]
 }
 
@@ -311,7 +311,7 @@ tags: [oldtag, other]
     assert_success
     local dow week_start
     dow=$(date +%u)
-    week_start=$(date -d "-$((dow - 1)) days" +%F)
+    week_start=$(test_date_add "$(date +%F)" "-$((dow - 1))")
     run grep "tags:" "${FAKE_VAULT_DIR}/public/daily/${week_start}-weekly.md"
     assert_output --partial "work"
     assert_output --partial "journal"
@@ -369,7 +369,7 @@ tags: [foo]
     assert_success
     local dow week_start
     dow=$(date +%u)
-    week_start=$(date -d "-$((dow - 1)) days" +%F)
+    week_start=$(test_date_add "$(date +%F)" "-$((dow - 1))")
     [ -f "${FAKE_VAULT_DIR}/private/daily/${week_start}-weekly.md" ]
 }
 

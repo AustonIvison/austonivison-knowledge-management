@@ -74,6 +74,7 @@ source "${OKM_SCRIPT_DIR}/scripts/lib/privacy.sh"
 source "${OKM_SCRIPT_DIR}/scripts/lib/media.sh"   # spot, yt, pod, distill
 # shellcheck source=scripts/lib/platform.sh
 source "${OKM_SCRIPT_DIR}/scripts/lib/platform.sh"   # _date_add (portable week math)
+_require_bash4
 
 # N20: collapse vertical whitespace before slugifying.
 # N14: fail-closed on empty/short slugs. N18: cap at 200 chars.
@@ -253,7 +254,7 @@ write_tags_line() {
   local new_line="$2"
   local tmp orig_perms
   tmp="$(mktemp -- "${file}.XXXXXX")"
-  orig_perms="$(stat -c '%a' "$file" 2>/dev/null)" || orig_perms=""
+  orig_perms="$(_file_mode "$file" 2>/dev/null)" || orig_perms=""
   awk -v new_line="$new_line" '
     BEGIN { c = 0; replaced = 0; in_after = 0; skip_block = 0 }
     {
@@ -302,15 +303,15 @@ resolve_note() {
   local arg="$1"
   local resolved=""
   if [ -f "$arg" ]; then
-    resolved="$(realpath -- "$arg" 2>/dev/null || true)"
+    resolved="$(_realpath -- "$arg" 2>/dev/null || true)"
   elif [ -f "$VAULT/$arg" ]; then
-    resolved="$(realpath -- "$VAULT/$arg" 2>/dev/null || true)"
+    resolved="$(_realpath -- "$VAULT/$arg" 2>/dev/null || true)"
   else
     echo "Note not found: $arg" >&2
     return 1
   fi
   local vault_real
-  vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
+  vault_real="$(_realpath -- "$VAULT" 2>/dev/null || true)"
   _assert_in_vault "$resolved" "$vault_real" "okm" || return 1
   echo "$resolved"
 }
@@ -562,11 +563,11 @@ open_note() {
     final="$VAULT/$target"
   fi
 
-  # N19: refuse paths that resolve outside the vault. realpath -m resolves
+  # N19: refuse paths that resolve outside the vault. _realpath -m resolves
   # even non-existent paths so `okm open new-note.md` still works.
   local resolved vault_real
-  resolved="$(realpath -m -- "$final" 2>/dev/null || true)"
-  vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
+  resolved="$(_realpath -m -- "$final" 2>/dev/null || true)"
+  vault_real="$(_realpath -- "$VAULT" 2>/dev/null || true)"
   if [ -z "$resolved" ] || [ -z "$vault_real" ]; then
     echo "okm open: cannot resolve target or vault path" >&2
     exit 1
@@ -694,7 +695,6 @@ files_vault() {
 }
 
 recent_notes() {
-  need_cmd fzf
   local picked file_list find_errs
   find_errs="$(mktemp 2>/dev/null || echo "/tmp/okm-recent-errs-$$")"
   file_list="$(
@@ -708,6 +708,8 @@ recent_notes() {
     echo "okm recent: warn — some vault directories may be unreadable: $VAULT" >&2
   fi
   rm -f "$find_errs" 2>/dev/null || true
+  [ -n "$file_list" ] || return 0
+  need_cmd fzf
   picked="$(
     printf '%s\n' "$file_list" \
       | sort -nr \
@@ -718,8 +720,8 @@ recent_notes() {
   )" || true  # fzf exits 130 on Escape/Ctrl-C; treat as empty selection
   [ -n "${picked:-}" ] || exit 0
   local resolved vault_real
-  resolved="$(realpath -m -- "$VAULT/$picked" 2>/dev/null || true)"
-  vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
+  resolved="$(_realpath -m -- "$VAULT/$picked" 2>/dev/null || true)"
+  vault_real="$(_realpath -- "$VAULT" 2>/dev/null || true)"
   _assert_in_vault "$resolved" "$vault_real" "okm recent" || exit 1
   exec "$EDITOR_CMD" "$VAULT/$picked"
 }
@@ -759,12 +761,12 @@ sync_git() {
 
   # N15: refuse to sync if any symlink in the vault points outside the vault.
   local vault_real bad_links=""
-  vault_real="$(realpath -- "$VAULT" 2>/dev/null || true)"
+  vault_real="$(_realpath -- "$VAULT" 2>/dev/null || true)"
   if [ -n "$vault_real" ]; then
     while IFS= read -r link; do
       [ -n "$link" ] || continue
       local tgt
-      tgt="$(realpath -m -- "$link" 2>/dev/null || true)"
+      tgt="$(_realpath -m -- "$link" 2>/dev/null || true)"
       [ -n "$tgt" ] || continue
       case "$tgt" in
         "$vault_real"|"$vault_real"/*) ;;
@@ -820,7 +822,7 @@ sync_git() {
 }
 
 open_obsidian() {
-  flatpak run md.obsidian.Obsidian >/dev/null 2>&1 &
+  _launch_obsidian
 }
 
 # === okm audit ===

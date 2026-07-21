@@ -170,12 +170,12 @@ tags: []
     local resolved
     resolved=$(
         cd "$km_root"
-        KM_ROOT="$km_root"
+        KM_ROOT="$(pwd -P)"
         _safe_path="$(
             printf '%s' "$test_path" | tr ':' '\n' | while IFS= read -r _p; do
                 _canon="$(cd -- "$_p" 2>/dev/null && pwd -P)"
                 [ "$_canon" != "${KM_ROOT}/bin" ] && printf '%s\n' "$_p"
-            done | paste -sd:
+            done | paste -s -d ':' -
         )"
         PATH="${_safe_path}" command -v vim 2>/dev/null
     )
@@ -202,7 +202,7 @@ tags: []
         cd "$km_root"
         KM_ROOT="$km_root"
         # Old (broken) approach: grep-only strip.
-        _safe_path_old="$(printf '%s' "$test_path" | tr ':' '\n' | grep -vxF "${KM_ROOT}/bin" | paste -sd:)"
+        _safe_path_old="$(printf '%s' "$test_path" | tr ':' '\n' | grep -vxF "${KM_ROOT}/bin" | paste -s -d ':' -)"
         PATH="${_safe_path_old}" command -v vim 2>/dev/null
     )
 

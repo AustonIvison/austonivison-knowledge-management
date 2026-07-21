@@ -19,6 +19,7 @@ setup() {
     local funcs_src
     funcs_src="$(sed -n '1,/^# --- Install steps ---/p' "${PROJECT_ROOT}/scripts/setup-km.sh" \
         | sed 's/^set -euo pipefail/set +e; set -uo pipefail/' \
+        | grep -v '^SCRIPT_DIR=' \
         | grep -v '^mkdir -p "\${LOG_DIR}"' \
         | grep -v "^trap ")"
     eval "$funcs_src"
@@ -98,10 +99,10 @@ setup() {
     mkdir -p "$target"
     ensure_gitignore "$target"
     local hash1
-    hash1="$(sha256sum "${target}/.gitignore" | cut -d' ' -f1)"
+    hash1="$(file_sha256 "${target}/.gitignore")"
     ensure_gitignore "$target"
     local hash2
-    hash2="$(sha256sum "${target}/.gitignore" | cut -d' ' -f1)"
+    hash2="$(file_sha256 "${target}/.gitignore")"
     [ "$hash1" = "$hash2" ]
 }
 
@@ -264,10 +265,9 @@ WRAPPER
 
 # === Scoping guarantees ===
 
-@test "setup-km.sh does not reference ~/.zshrc for writes" {
-    # The script should not contain ensure_shell_line or replace_shell_line calls
-    run grep -c 'ensure_shell_line\|replace_shell_line' "${PROJECT_ROOT}/scripts/setup-km.sh"
-    assert_output "0"
+@test "setup-km.sh limits shell-profile writes to a generic direnv hook" {
+    grep -q 'direnv hook zsh' "${PROJECT_ROOT}/scripts/setup-km.sh"
+    ! grep -q 'OBSIDIAN_VAULT.*>>.*zshrc\|OBSIDIAN_VAULT.*>>.*bashrc' "${PROJECT_ROOT}/scripts/setup-km.sh"
 }
 
 @test "setup-km.sh does not symlink ~/.config/nvim" {
@@ -309,6 +309,94 @@ WRAPPER
     run grep -c 'flatpak list --user' "${PROJECT_ROOT}/scripts/setup-km.sh"
     assert_success
     [ "$output" -ge 1 ]
+}
+
+# === Homebrew macOS path ===
+
+_setup_fake_brew() {
+    local fake_bin="${TEST_TEMP_DIR}/fake-brew-bin"
+    mkdir -p "${fake_bin}"
+    cat > "${fake_bin}/brew" <<'BREW'
+#!/usr/bin/env bash
+case "$1" in
+    --prefix)
+        printf '%s\n' "${FAKE_BREW_PREFIX:-/fake/homebrew}"
+        ;;
+    list)
+        [ "${3:-}" = "bash" ]
+        ;;
+    install)
+        printf '%s\n' "$*" >> "${BREW_LOG}"
+        ;;
+esac
+BREW
+    chmod +x "${fake_bin}/brew"
+    export PATH="${fake_bin}:${PATH}"
+}
+
+@test "require_homebrew fails with official guidance when brew is absent" {
+    local original_path="${PATH}"
+    PATH="/usr/bin:/bin"
+    run require_homebrew
+    PATH="${original_path}"
+    assert_failure
+    assert_output --partial "https://brew.sh/"
+}
+
+@test "require_homebrew records prefix and prepends its bin directory" {
+    _setup_fake_brew
+    FAKE_BREW_PREFIX="${TEST_TEMP_DIR}/homebrew"
+    mkdir -p "${FAKE_BREW_PREFIX}/bin"
+    export FAKE_BREW_PREFIX
+
+    require_homebrew
+
+    [ "${HOMEBREW_PREFIX}" = "${FAKE_BREW_PREFIX}" ]
+    [[ ":${PATH}:" == *":${FAKE_BREW_PREFIX}/bin:"* ]]
+}
+
+@test "install_brew_packages installs only missing formulae" {
+    export BREW_LOG="${TEST_TEMP_DIR}/brew.log"
+    _setup_fake_brew
+
+    install_brew_packages bash ripgrep
+
+    grep -q '^install ripgrep$' "${BREW_LOG}"
+    ! grep -q 'install.*bash' "${BREW_LOG}"
+}
+
+@test "install_obsidian_macos uses Homebrew Cask when app is absent" {
+    export BREW_LOG="${TEST_TEMP_DIR}/brew-cask.log"
+    local fake_bin="${TEST_TEMP_DIR}/fake-obsidian-bin"
+    mkdir -p "${fake_bin}"
+    printf '#!/usr/bin/env bash\nexit 1\n' > "${fake_bin}/open"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "${BREW_LOG}"\n' > "${fake_bin}/brew"
+    chmod +x "${fake_bin}/open" "${fake_bin}/brew"
+    PATH="${fake_bin}:${PATH}"
+
+    install_obsidian_macos
+
+    grep -q '^install --cask obsidian$' "${BREW_LOG}"
+}
+
+@test "detect_platform recognizes the current supported runner" {
+    detect_platform
+    case "$(uname -s)" in
+        Darwin) [ "${PLATFORM_OS}" = "macos" ] ;;
+        Linux)  [ "${PLATFORM_OS}" = "linux" ] ;;
+        *)      false ;;
+    esac
+    case "$(uname -m)" in
+        arm64|aarch64) [ "${PLATFORM_ARCH}" = "arm64" ] ;;
+        x86_64|amd64)  [ "${PLATFORM_ARCH}" = "x86_64" ] ;;
+        *)             false ;;
+    esac
+}
+
+@test "setup dry-run works with the operating system's /bin/bash" {
+    run env HOME="${TEST_TEMP_DIR}/dry-run-home" /bin/bash "${PROJECT_ROOT}/scripts/setup-km.sh" --dry-run
+    assert_success
+    assert_output --partial "DRY RUN"
 }
 
 # === install_direnv — see tests/direnv.bats ===

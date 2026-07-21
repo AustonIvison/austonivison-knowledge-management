@@ -47,8 +47,22 @@ _warn()    { printf "${YELLOW}[WARN]${NC} %s\n" "$1"; WARN_COUNT=$((WARN_COUNT +
 _skip()    { printf "${BOLD}[SKIP]${NC} %s\n" "$1"; }
 _section() { printf "\n${BOLD}── %s ${NC}\n" "$1"; }
 
-# ── System packages (apt) ────────────────────────────────────────────────────
+# ── System packages ──────────────────────────────────────────────────────────
 _section "System packages"
+
+if is_macos; then
+    if command -v brew >/dev/null 2>&1; then
+        _pass "Homebrew  ($(command -v brew))"
+    else
+        _fail "Homebrew not found — install it from https://brew.sh/"
+    fi
+fi
+
+if [ "${BASH_VERSINFO[0]:-0}" -ge 4 ]; then
+    _pass "bash ${BASH_VERSION}  ($(command -v bash))"
+else
+    _fail "bash ${BASH_VERSION:-unknown} is too old — run: $(_pkg_install_hint bash), source env.sh, and retry"
+fi
 
 for cmd in vim git rg fzf curl; do
     if command -v "${cmd}" >/dev/null 2>&1; then
@@ -82,19 +96,27 @@ else
     fi
 fi
 
-# ── Flatpak / Obsidian ───────────────────────────────────────────────────────
-_section "Flatpak / Obsidian"
-
-if command -v flatpak >/dev/null 2>&1; then
-    _pass "flatpak  ($(command -v flatpak))"
+# ── Obsidian ─────────────────────────────────────────────────────────────────
+if is_macos; then
+    _section "Native Obsidian"
+    if command -v open >/dev/null 2>&1 && open -Ra "Obsidian" >/dev/null 2>&1; then
+        _pass "native Obsidian application installed"
+    else
+        _fail "Obsidian not installed — run: brew install --cask obsidian"
+    fi
 else
-    _fail "flatpak not found — run: sudo apt install flatpak"
-fi
+    _section "Flatpak / Obsidian"
+    if command -v flatpak >/dev/null 2>&1; then
+        _pass "flatpak  ($(command -v flatpak))"
+    else
+        _fail "flatpak not found — run: sudo apt install flatpak"
+    fi
 
-if flatpak list --app --columns=application 2>/dev/null | grep -qx 'md.obsidian.Obsidian'; then
-    _pass "Obsidian flatpak installed (md.obsidian.Obsidian)"
-else
-    _fail "Obsidian not installed — run: flatpak install flathub md.obsidian.Obsidian"
+    if flatpak list --user --app --columns=application 2>/dev/null | grep -qx 'md.obsidian.Obsidian'; then
+        _pass "Obsidian flatpak installed (md.obsidian.Obsidian)"
+    else
+        _fail "Obsidian not installed — run: flatpak install --user flathub md.obsidian.Obsidian"
+    fi
 fi
 
 # ── Project binaries ────────────────────────────────────────────────────────
@@ -278,8 +300,6 @@ fi  # CHECK_NVIM (Neovim config)
 # ── Nerd Font (terminal icons) ──────────────────────────────────────────────
 _section "Nerd Font"
 
-is_wsl2() { grep -qi 'microsoft' /proc/version 2>/dev/null; }
-
 if is_wsl2; then
     win_user="$(cmd.exe /c 'echo %USERNAME%' 2>/dev/null | tr -d '\r')"
     win_font_dir="/mnt/c/Users/${win_user}/AppData/Local/Microsoft/Windows/Fonts"
@@ -288,7 +308,7 @@ if is_wsl2; then
     else
         _fail "Nerd Font not installed — run: bash setup-km.sh (icons will show as '?')"
     fi
-elif [ "$(uname -s)" = "Darwin" ]; then
+elif is_macos; then
     if ls "${HOME}/Library/Fonts"/JetBrainsMonoNerdFont-Regular.ttf >/dev/null 2>&1; then
         _pass "JetBrainsMono Nerd Font installed (~/Library/Fonts)"
     else
@@ -312,8 +332,8 @@ else
 fi
 
 # N6: warn when project dir and vault dir resolve to the same path (co-located).
-_project_real="$(realpath -- "${SCRIPT_DIR}" 2>/dev/null || true)"
-_vault_real="$(realpath -- "${VAULT_DIR}" 2>/dev/null || true)"
+_project_real="$(_realpath -- "${SCRIPT_DIR}" 2>/dev/null || true)"
+_vault_real="$(_realpath -- "${VAULT_DIR}" 2>/dev/null || true)"
 if [ -n "${_project_real}" ] && [ "${_project_real}" = "${_vault_real}" ]; then
     _warn "vault and project are co-located (same directory: ${_project_real}). Set OBSIDIAN_VAULT to separate them."
 else
@@ -330,17 +350,39 @@ if command -v direnv >/dev/null 2>&1; then
         _warn "direnv: .envrc not allowed — run: direnv allow . to activate auto-loading"
     fi
 else
-    _warn "direnv not installed — run: sudo apt install direnv (or see https://direnv.net/); auto-activation will not work"
+    _warn "direnv not installed — run: $(_pkg_install_hint direnv) (or see https://direnv.net/); auto-activation will not work"
 fi
 
-# Check that env.sh did NOT modify ~/.zshrc
-if [ -f "${HOME}/.zshrc" ]; then
-    if grep -qF 'OBSIDIAN_VAULT' "${HOME}/.zshrc" 2>/dev/null; then
-        _warn "~/.zshrc contains OBSIDIAN_VAULT — may be leftover from old setup; env.sh handles this now"
+# Verify the generic direnv hook for the active shell.
+_verify_shell="${KM_SHELL:-${SHELL:-}}"
+_verify_shell="${_verify_shell##*/}"
+if [ -z "${_verify_shell}" ]; then
+    if is_macos; then _verify_shell="zsh"; else _verify_shell="bash"; fi
+fi
+case "${_verify_shell}" in
+    zsh)  _verify_shell_rc="${HOME}/.zshrc" ;;
+    bash) _verify_shell_rc="${HOME}/.bashrc" ;;
+    *)    _verify_shell_rc="" ;;
+esac
+if [ -n "${_verify_shell_rc}" ]; then
+    if grep -qF "direnv hook ${_verify_shell}" "${_verify_shell_rc}" 2>/dev/null; then
+        _pass "direnv ${_verify_shell} hook configured in ${_verify_shell_rc}"
     else
-        _pass "~/.zshrc does not contain project-specific exports"
+        _warn "direnv ${_verify_shell} hook missing — re-run setup or add: eval \"\$(direnv hook ${_verify_shell})\""
     fi
 fi
+unset _verify_shell _verify_shell_rc
+
+# Project variables belong in env.sh, never in shell startup files.
+for _shell_rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
+    [ -f "${_shell_rc}" ] || continue
+    if grep -qF 'OBSIDIAN_VAULT' "${_shell_rc}" 2>/dev/null; then
+        _warn "${_shell_rc} contains OBSIDIAN_VAULT — may be leftover from old setup; env.sh handles this now"
+    else
+        _pass "${_shell_rc} does not contain project-specific exports"
+    fi
+done
+unset _shell_rc
 
 # ── lazygit config ──────────────────────────────────────────────────────────
 _section "lazygit config"
@@ -388,11 +430,15 @@ fi
 # ── Offline mode enforcement ─────────────────────────────────────────────────
 _section "Offline mode enforcement"
 
-obsidian_override="${HOME}/.local/share/flatpak/overrides/md.obsidian.Obsidian"
-if [ -f "${obsidian_override}" ] && grep -q '!network' "${obsidian_override}"; then
-    _pass "Obsidian: network revoked via flatpak sandbox"
+if is_macos; then
+    _warn "Obsidian: native macOS app network access is not forcibly revoked; automatic plugin update checks remain disabled"
 else
-    _fail "Obsidian has network access — run: flatpak override --user --unshare=network md.obsidian.Obsidian"
+    obsidian_override="${HOME}/.local/share/flatpak/overrides/md.obsidian.Obsidian"
+    if [ -f "${obsidian_override}" ] && grep -q '!network' "${obsidian_override}"; then
+        _pass "Obsidian: network revoked via flatpak sandbox"
+    else
+        _fail "Obsidian has network access — run: flatpak override --user --unshare=network md.obsidian.Obsidian"
+    fi
 fi
 
 # ── Security (advisory — WARNs only, never block) ────────────────────────────
