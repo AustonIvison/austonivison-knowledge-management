@@ -695,7 +695,6 @@ files_vault() {
 }
 
 recent_notes() {
-  need_cmd fzf
   local picked file_list find_errs
   find_errs="$(mktemp 2>/dev/null || echo "/tmp/okm-recent-errs-$$")"
   file_list="$(
@@ -710,6 +709,7 @@ recent_notes() {
   fi
   rm -f "$find_errs" 2>/dev/null || true
   [ -n "$file_list" ] || return 0
+  need_cmd fzf
   picked="$(
     printf '%s\n' "$file_list" \
       | sort -nr \
